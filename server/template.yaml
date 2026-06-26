@@ -61,7 +61,7 @@ Resources:
       # Inject VPC configuration enabling Lambda to communicate with RDS
       VpcConfig:
         SecurityGroupIds: !Ref VpcSecurityGroupIds
-        SubnetIdRefs: !Ref VpcSubnetIds
+        SubnetIds: !Ref VpcSubnetIds
 
       Environment:
         Variables:
