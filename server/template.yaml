@@ -76,10 +76,8 @@ Resources:
         # Permitting Lambda to read credentials securely from Secrets Manager at runtime
         - AWSSecretsManagerGetSecretValuePolicy:
             SecretArn: !Ref DatabaseSecretsArn
-        - AWSSecretsManagerGetSecretValuePolicy:
-            SecretArn: "arn:aws:secretsmanager:*:*:secret:blinklean/admin/jwt-*"
         # VPC access execution policy required for Lambda ENI creation
-        - AWSLambdaVPCAccessExecutionRole
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaVPCAccessExecutionRole
 
       Events:
         # Proxy all incoming traffic greedily to the Express Routing Framework
