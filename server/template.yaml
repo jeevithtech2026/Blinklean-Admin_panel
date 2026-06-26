@@ -12,11 +12,11 @@ Parameters:
     Description: Deployment stage environment.
 
   VpcSecurityGroupIds:
-    Type: List<AWS::EC2::SecurityGroup::Id>
+    Type: CommaDelimitedList
     Description: List of Security Groups allowing database access inside the VPC.
 
   VpcSubnetIds:
-    Type: List<AWS::EC2::Subnet::Id>
+    Type: CommaDelimitedList
     Description: List of Private Subnets inside the VPC with routing to AWS RDS nodes.
 
   CustomerDbEndpoint:
