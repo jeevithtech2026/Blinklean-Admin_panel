@@ -11,13 +11,7 @@ Parameters:
     AllowedValues: [development, staging, production]
     Description: Deployment stage environment.
 
-  VpcSecurityGroupIds:
-    Type: CommaDelimitedList
-    Description: List of Security Groups allowing database access inside the VPC.
 
-  VpcSubnetIds:
-    Type: CommaDelimitedList
-    Description: List of Private Subnets inside the VPC with routing to AWS RDS nodes.
 
   CustomerDbEndpoint:
     Type: String
@@ -58,10 +52,6 @@ Resources:
       Timeout: 15
       MemorySize: 512
       
-      # Inject VPC configuration enabling Lambda to communicate with RDS
-      VpcConfig:
-        SecurityGroupIds: !Ref VpcSecurityGroupIds
-        SubnetIds: !Ref VpcSubnetIds
 
       Environment:
         Variables:
@@ -76,8 +66,6 @@ Resources:
         # Permitting Lambda to read credentials securely from Secrets Manager at runtime
         - AWSSecretsManagerGetSecretValuePolicy:
             SecretArn: !Ref DatabaseSecretsArn
-        # VPC access execution policy required for Lambda ENI creation
-        - arn:aws:iam::aws:policy/service-role/AWSLambdaVPCAccessExecutionRole
 
       Events:
         # Proxy all incoming traffic greedily to the Express Routing Framework
