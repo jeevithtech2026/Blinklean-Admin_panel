@@ -1,0 +1,17 @@
+# ==============================================================================
+# Netlify Configuration File
+# ==============================================================================
+# Handles static hosting configuration and Single Page Application (SPA) redirects.
+
+[build]
+  publish = "dist"
+  command = "npm run build"
+
+# Fallback SPA routing rule: Redirect all requests to index.html
+# This allows React Router DOM client-side pathing (e.g. /partners, /analytics)
+# to load correctly when a page is directly reloaded or accessed.
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200
+  force = false

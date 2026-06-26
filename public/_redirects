@@ -1,0 +1,3 @@
+# Fallback routing rule for Single Page Applications (SPA)
+# Redirects all paths to index.html so client-side routing handles them
+/*    /index.html    200

@@ -1,0 +1,23 @@
+{
+  "name": "blinklean-admin-backend",
+  "version": "1.0.0",
+  "description": "BlinkLean Admin Panel API Aggregation Backend Service",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js"
+  },
+  "dependencies": {
+    "@aws-sdk/client-cognito-identity-provider": "^3.1075.0",
+    "@aws-sdk/client-dynamodb": "^3.1075.0",
+    "@aws-sdk/client-route-53": "^3.500.0",
+    "@aws-sdk/client-secrets-manager": "^3.500.0",
+    "@aws-sdk/lib-dynamodb": "^3.1075.0",
+    "@vendia/serverless-express": "^4.12.6",
+    "cors": "^2.8.5",
+    "dotenv": "^17.4.2",
+    "express": "^4.19.2",
+    "jsonwebtoken": "^9.0.2",
+    "pg": "^8.11.5",
+    "winston": "^3.12.0"
+  }
+}

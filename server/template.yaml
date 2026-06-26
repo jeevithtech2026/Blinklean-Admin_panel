@@ -1,0 +1,107 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: >
+  AWS SAM Template for BlinkLean Admin Panel API Aggregation Service.
+  Deploys the Express server backend inside a Serverless Lambda behind API Gateway.
+
+Parameters:
+  Environment:
+    Type: String
+    Default: production
+    AllowedValues: [development, staging, production]
+    Description: Deployment stage environment.
+
+  VpcSecurityGroupIds:
+    Type: List<AWS::EC2::SecurityGroup::Id>
+    Description: List of Security Groups allowing database access inside the VPC.
+
+  VpcSubnetIds:
+    Type: List<AWS::EC2::Subnet::Id>
+    Description: List of Private Subnets inside the VPC with routing to AWS RDS nodes.
+
+  CustomerDbEndpoint:
+    Type: String
+    Default: customer-rds-cluster.internal.rds.amazonaws.com
+    Description: Customer DB DNS endpoint hostname.
+
+  PartnerDbEndpoint:
+    Type: String
+    Default: partner-rds-cluster.internal.rds.amazonaws.com
+    Description: Partner DB DNS endpoint hostname.
+
+  DatabaseSecretsArn:
+    Type: String
+    Description: ARN of the AWS Secrets Manager Secret storing DB connection credentials.
+
+Resources:
+  # ==============================================================================
+  # 1. API Gateway REST API with CORS configured
+  # ==============================================================================
+  AdminGatewayApi:
+    Type: AWS::Serverless::Api
+    Properties:
+      StageName: !Ref Environment
+      Cors:
+        AllowMethods: "'GET,POST,PUT,DELETE,OPTIONS'"
+        AllowHeaders: "'Content-Type,Authorization'"
+        AllowOrigin: "'*'" # Replace with specific frontend subdomain domain in production (e.g. "'https://admin.blinklean.com'")
+
+  # ==============================================================================
+  # 2. Serverless Lambda Function hosting Express App
+  # ==============================================================================
+  AdminAggregationFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: ./
+      Handler: lambda.handler # Points to lambda.js wrapper executing serverless-express
+      Runtime: nodejs18.x
+      Timeout: 15
+      MemorySize: 512
+      
+      # Inject VPC configuration enabling Lambda to communicate with RDS
+      VpcConfig:
+        SecurityGroupIds: !Ref VpcSecurityGroupIds
+        SubnetIdRefs: !Ref VpcSubnetIds
+
+      Environment:
+        Variables:
+          NODE_ENV: !Ref Environment
+          CUSTOMER_DB_HOST: !Ref CustomerDbEndpoint
+          PARTNER_DB_HOST: !Ref PartnerDbEndpoint
+          DB_SECRETS_ARN: !Ref DatabaseSecretsArn
+          JWT_SECRET_NAME: "blinklean/admin/jwt"
+
+      # Access Policies configuration
+      Policies:
+        # Permitting Lambda to read credentials securely from Secrets Manager at runtime
+        - AWSSecretsManagerGetSecretValuePolicy:
+            SecretArn: !Ref DatabaseSecretsArn
+        - AWSSecretsManagerGetSecretValuePolicy:
+            SecretArn: "arn:aws:secretsmanager:*:*:secret:blinklean/admin/jwt-*"
+        # VPC access execution policy required for Lambda ENI creation
+        - AWSLambdaVPCAccessExecutionRole
+
+      Events:
+        # Proxy all incoming traffic greedily to the Express Routing Framework
+        ProxyApiGreedy:
+          Type: Api
+          Properties:
+            RestApiId: !Ref AdminGatewayApi
+            Path: /{proxy+}
+            Method: ANY
+        ProxyApiRoot:
+          Type: Api
+          Properties:
+            RestApiId: !Ref AdminGatewayApi
+            Path: /
+            Method: ANY
+
+Outputs:
+  # ==============================================================================
+  # Exported endpoint URL
+  # ==============================================================================
+  AdminApiUrl:
+    Description: "Production API Gateway URL endpoint for the BlinkLean Admin backend service"
+    Value: !Sub "https://${AdminGatewayApi}.execute-api.${AWS::Region}.amazonaws.com/${Environment}/"
+    Export:
+      Name: !Sub "${AWS::StackName}-AdminApiUrl"
