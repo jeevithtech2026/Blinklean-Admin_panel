@@ -6,6 +6,7 @@ const requestLogger = require('./middleware/requestLogger');
 const adminRoutes = require('./routes/admin');
 const healthRoutes = require('./routes/health');
 const dataRoutes = require('./routes/data');
+const authRoutes = require('./routes/auth');
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -31,6 +32,9 @@ app.use('/api/v1/admin', authMiddleware, adminRoutes);
 
 // DynamoDB data routes - all 8 tables accessible via /api/v1/data/*
 app.use('/api/v1/data', dataRoutes);
+
+// Auth routes for Cognito admin login
+app.use('/api/v1/auth', authRoutes);
 
 // 6. Basic service health validation endpoint
 app.get('/health', (req, res) => {

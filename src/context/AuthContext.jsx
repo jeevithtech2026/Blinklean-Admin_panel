@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useState } from 'react';
+import axiosInstance from '../api/axiosInstance';
 
 const AuthContext = createContext(null);
 
@@ -17,29 +18,31 @@ export const AuthProvider = ({ children }) => {
     setIsLoading(true);
     setError(null);
     try {
-      // Simulate network request latency for real UI experience
-      await new Promise((resolve) => setTimeout(resolve, 800));
-
       if (!username.trim() || !password.trim()) {
         throw new Error('Username and password are required');
       }
 
-      if (username.trim() !== 'admin' || password.trim() !== 'password123') {
-        throw new Error('Invalid username or password (Hint: admin / password123)');
+      // Authenticate with the AWS Cognito backend endpoint
+      const response = await axiosInstance.post('/api/v1/auth/login', {
+        username: username.trim(),
+        password: password,
+      });
+
+      if (response.data && response.data.token) {
+        const { token, user } = response.data;
+
+        localStorage.setItem('admin_token', token);
+        localStorage.setItem('admin_user', JSON.stringify(user));
+        
+        setIsAuthenticated(true);
+        setAdminUser(user);
+        return true;
+      } else {
+        throw new Error('Invalid authentication response from server');
       }
-
-      // Generate a mock token and store standard details
-      const mockToken = 'mock_admin_token_' + Math.random().toString(36).substring(2);
-      const user = { username: username.trim(), role: 'Super Admin' };
-
-      localStorage.setItem('admin_token', mockToken);
-      localStorage.setItem('admin_user', JSON.stringify(user));
-      
-      setIsAuthenticated(true);
-      setAdminUser(user);
-      return true;
     } catch (err) {
-      setError(err.message || 'Login failed. Please try again.');
+      const errMsg = err.response?.data?.error || err.message || 'Login failed. Please try again.';
+      setError(errMsg);
       return false;
     } finally {
       setIsLoading(false);
