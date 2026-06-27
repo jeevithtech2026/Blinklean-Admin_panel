@@ -9,6 +9,7 @@ const clientConfig = {
 
 let userPoolId = process.env.COGNITO_USER_POOL_ID;
 let clientId = process.env.COGNITO_CLIENT_ID;
+let clientSecret = process.env.COGNITO_CLIENT_SECRET;
 
 // Parse server/.env file directly if it exists to override defaults
 const envPath = path.resolve(__dirname, '../.env');
@@ -20,6 +21,9 @@ if (fs.existsSync(envPath)) {
     }
     if (envConfig.COGNITO_CLIENT_ID) {
       clientId = envConfig.COGNITO_CLIENT_ID;
+    }
+    if (envConfig.COGNITO_CLIENT_SECRET) {
+      clientSecret = envConfig.COGNITO_CLIENT_SECRET;
     }
     if (envConfig.AWS_ACCESS_KEY_ID && envConfig.AWS_SECRET_ACCESS_KEY) {
       clientConfig.credentials = {
@@ -50,4 +54,5 @@ module.exports = {
   cognitoClient,
   COGNITO_USER_POOL_ID: userPoolId,
   COGNITO_CLIENT_ID: clientId,
+  COGNITO_CLIENT_SECRET: clientSecret,
 };

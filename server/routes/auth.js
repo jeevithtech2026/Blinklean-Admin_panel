@@ -1,7 +1,15 @@
 const express = require('express');
 const router = express.Router();
 const { InitiateAuthCommand } = require('@aws-sdk/client-cognito-identity-provider');
-const { cognitoClient, COGNITO_CLIENT_ID } = require('../config/cognito');
+const { cognitoClient, COGNITO_CLIENT_ID, COGNITO_CLIENT_SECRET } = require('../config/cognito');
+const crypto = require('crypto');
+
+function calculateSecretHash(username, clientId, clientSecret) {
+  return crypto
+    .createHmac('SHA256', clientSecret)
+    .update(username + clientId)
+    .digest('base64');
+}
 
 // POST /api/v1/auth/login - Authenticate admin credentials with AWS Cognito
 router.post('/login', async (req, res) => {
@@ -19,13 +27,19 @@ router.post('/login', async (req, res) => {
   console.log(`[Auth API] Sign-in attempt received for user: ${username}`);
 
   try {
+    const authParameters = {
+      USERNAME: username,
+      PASSWORD: password,
+    };
+
+    if (COGNITO_CLIENT_SECRET) {
+      authParameters.SECRET_HASH = calculateSecretHash(username, COGNITO_CLIENT_ID, COGNITO_CLIENT_SECRET);
+    }
+
     const command = new InitiateAuthCommand({
       AuthFlow: 'USER_PASSWORD_AUTH',
       ClientId: COGNITO_CLIENT_ID,
-      AuthParameters: {
-        USERNAME: username,
-        PASSWORD: password,
-      },
+      AuthParameters: authParameters,
     });
 
     const response = await cognitoClient.send(command);
