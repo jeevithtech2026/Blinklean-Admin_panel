@@ -6,6 +6,7 @@ frontend:
         - npm ci
     build:
       commands:
+        - export VITE_ADMIN_API_GATEWAY_URL="https://95t7w0g5nd.execute-api.ap-south-1.amazonaws.com/production"
         - npm run build
   artifacts:
     baseDirectory: dist
