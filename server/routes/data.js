@@ -4,6 +4,7 @@ const { dynamoDB } = require('../config/dynamodb');
 const { ScanCommand, GetCommand, QueryCommand, PutCommand, DeleteCommand } = require('@aws-sdk/lib-dynamodb');
 
 const { CognitoIdentityProviderClient, ListUsersCommand } = require('@aws-sdk/client-cognito-identity-provider');
+const { encrypt, decrypt } = require('../utils/encryption');
 
 // ─── USERS ───────────────────────────────────────────────────────────────────
 
@@ -89,7 +90,16 @@ router.post('/users/register', async (req, res) => {
 router.get('/partners', async (req, res) => {
   try {
     const result = await dynamoDB.send(new ScanCommand({ TableName: 'Partners' }));
-    res.json({ success: true, count: result.Count, data: result.Items });
+    
+    // Decrypt sensitive bank details before sending to admin
+    const decryptedItems = (result.Items || []).map(partner => {
+      if (partner.bankDetails && partner.bankDetails.accountNumber) {
+        partner.bankDetails.accountNumber = decrypt(partner.bankDetails.accountNumber);
+      }
+      return partner;
+    });
+
+    res.json({ success: true, count: result.Count, data: decryptedItems });
   } catch (err) {
     console.error('[Partners] Scan error:', err.message);
     res.status(500).json({ success: false, error: err.message });
@@ -104,9 +114,53 @@ router.get('/partners/:id', async (req, res) => {
       Key: { id: req.params.id },
     }));
     if (!result.Item) return res.status(404).json({ success: false, error: 'Partner not found' });
+    
+    // Decrypt sensitive bank details before sending to admin
+    if (result.Item.bankDetails && result.Item.bankDetails.accountNumber) {
+      result.Item.bankDetails.accountNumber = decrypt(result.Item.bankDetails.accountNumber);
+    }
+    
     res.json({ success: true, data: result.Item });
   } catch (err) {
     console.error('[Partners] Get error:', err.message);
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// PUT /api/v1/admin/partners/:id/bank - Update partner bank details
+router.put('/partners/:id/bank', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { accountHolderName, bankName, accountNumber, ifscCode } = req.body;
+
+    if (!accountNumber || !ifscCode) {
+      return res.status(400).json({ success: false, error: 'Account Number and IFSC Code are required' });
+    }
+
+    // Encrypt the sensitive account number before saving
+    const encryptedAccountNumber = encrypt(accountNumber);
+
+    const bankDetails = {
+      accountHolderName: accountHolderName || '',
+      bankName: bankName || '',
+      accountNumber: encryptedAccountNumber,
+      ifscCode: ifscCode || '',
+      updatedAt: new Date().toISOString()
+    };
+
+    await dynamoDB.send(new UpdateCommand({
+      TableName: 'Partners',
+      Key: { id },
+      UpdateExpression: 'SET bankDetails = :bankDetails, updatedAt = :updatedAt',
+      ExpressionAttributeValues: {
+        ':bankDetails': bankDetails,
+        ':updatedAt': new Date().toISOString()
+      }
+    }));
+
+    res.json({ success: true, message: 'Bank details securely updated' });
+  } catch (err) {
+    console.error('[Partners] Bank Details Update error:', err.message);
     res.status(500).json({ success: false, error: err.message });
   }
 });

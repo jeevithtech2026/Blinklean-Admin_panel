@@ -1,6 +1,7 @@
 import React, { useState, useMemo, useEffect } from 'react';
-import { ShieldAlert, ArrowUpDown, ChevronLeft, ChevronRight, Search, CheckCircle, Clock, XCircle } from 'lucide-react';
+import { ShieldAlert, ArrowUpDown, ChevronLeft, ChevronRight, Search, CheckCircle, Clock, XCircle, Building2 } from 'lucide-react';
 import { useTheme } from '../context/ThemeContext';
+import BankDetailsModal from './BankDetailsModal';
 
 const PartnerTable = ({ partners }) => {
   const { density } = useTheme();
@@ -10,6 +11,8 @@ const PartnerTable = ({ partners }) => {
   const [sortDirection, setSortDirection] = useState(null);
   const [currentPage, setCurrentPage] = useState(1);
   const [rowsPerPage, setRowsPerPage] = useState(10);
+  const [selectedPartner, setSelectedPartner] = useState(null);
+  const [isModalOpen, setIsModalOpen] = useState(false);
 
   useEffect(() => {
     setCurrentPage(1);
@@ -114,6 +117,7 @@ const PartnerTable = ({ partners }) => {
                 </th>
                 <th className={thPadding}>KYC</th>
                 <th className={thPadding}>Joined</th>
+                <th className={`${thPadding} text-right`}>Actions</th>
               </tr>
             </thead>
             <tbody className={`divide-y divide-slate-100 dark:divide-slate-800 ${bodyTextSize}`}>
@@ -159,11 +163,24 @@ const PartnerTable = ({ partners }) => {
                     <td className={`${tdPadding} text-slate-500 dark:text-slate-400 font-medium`}>
                       {partner.createdAt ? new Date(partner.createdAt).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) : '—'}
                     </td>
+                    {/* Actions */}
+                    <td className={`${tdPadding} text-right`}>
+                      <button 
+                        onClick={() => {
+                          setSelectedPartner(partner);
+                          setIsModalOpen(true);
+                        }}
+                        className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-slate-100 dark:bg-slate-800 hover:bg-violet-100 dark:hover:bg-violet-900/40 text-slate-700 dark:text-slate-300 hover:text-violet-700 dark:hover:text-violet-400 rounded-lg text-xs font-bold transition-colors"
+                      >
+                        <Building2 className="h-3.5 w-3.5" />
+                        Bank
+                      </button>
+                    </td>
                   </tr>
                 ))
               ) : (
                 <tr>
-                  <td colSpan="6" className="px-6 py-12 text-center text-slate-400 dark:text-slate-500">
+                  <td colSpan="7" className="px-6 py-12 text-center text-slate-400 dark:text-slate-500">
                     <div className="flex flex-col items-center gap-3">
                       <ShieldAlert className="h-9 w-9 text-slate-300 dark:text-slate-700" />
                       <h4 className="text-sm font-bold text-slate-800 dark:text-slate-300">No records found</h4>
@@ -205,6 +222,17 @@ const PartnerTable = ({ partners }) => {
           </div>
         </div>
       </div>
+
+      <BankDetailsModal 
+        isOpen={isModalOpen}
+        onClose={() => setIsModalOpen(false)}
+        partner={selectedPartner}
+        onUpdate={(id, newBankDetails) => {
+          if (selectedPartner && selectedPartner.id === id) {
+            selectedPartner.bankDetails = newBankDetails;
+          }
+        }}
+      />
     </div>
   );
 };
