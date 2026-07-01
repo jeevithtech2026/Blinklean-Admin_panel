@@ -221,6 +221,34 @@ router.get('/bookings/:bookingId', async (req, res) => {
   }
 });
 
+// PUT /api/v1/data/bookings/:bookingId/status - Update booking status (Automated webhook for Partner App)
+router.put('/bookings/:bookingId/status', async (req, res) => {
+  try {
+    const { bookingId } = req.params;
+    const { status } = req.body;
+
+    if (!status) {
+      return res.status(400).json({ success: false, error: 'Status is required' });
+    }
+
+    await dynamoDB.send(new UpdateCommand({
+      TableName: 'bookings',
+      Key: { bookingId },
+      UpdateExpression: 'SET #st = :status, updatedAt = :updatedAt',
+      ExpressionAttributeNames: { '#st': 'status' }, // 'status' is a reserved keyword in DynamoDB
+      ExpressionAttributeValues: {
+        ':status': status,
+        ':updatedAt': new Date().toISOString()
+      }
+    }));
+
+    res.json({ success: true, message: `Booking ${bookingId} status updated to ${status}` });
+  } catch (err) {
+    console.error('[Bookings] Status Update error:', err.message);
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
 // ─── PARTNER LOCATIONS ────────────────────────────────────────────────────────
 
 // GET /api/v1/admin/partner-locations - List all partner locations

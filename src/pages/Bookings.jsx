@@ -2,18 +2,31 @@ import React, { useState, useEffect } from 'react';
 import { Calendar, RefreshCw, AlertTriangle, WifiOff, ListOrdered, CheckCircle, Clock } from 'lucide-react';
 import axiosInstance from '../api/axiosInstance';
 import BookingsTable from '../components/BookingsTable';
+import BookingFilter from '../components/BookingFilter';
 
 const Bookings = () => {
   const [bookings, setBookings] = useState([]);
   const [loading, setLoading] = useState(true);
   const [isOffline, setIsOffline] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
+  const [selectedCategory, setSelectedCategory] = useState('All');
 
-  // Derived Metrics
-  const activeCount = bookings.filter(b => ['confirmed', 'assigned', 'on-the-way', 'in-progress'].includes((b.status || '').toLowerCase())).length;
-  const pendingCount = bookings.filter(b => (b.status || '').toLowerCase() === 'pending').length;
-  const completedCount = bookings.filter(b => (b.status || '').toLowerCase() === 'completed').length;
-  const totalBookings = bookings.length;
+  // Derived Metrics (filtered by category)
+  const isHouseCleaning = (serviceName) => /house|home|deep|kitchen|bathroom|cleaning/i.test(serviceName) && !/vehicle|car|bike|wash/i.test(serviceName);
+  const isVehicleCleaning = (serviceName) => /vehicle|car|bike|wash/i.test(serviceName);
+
+  const filteredBookings = bookings.filter(b => {
+    if (selectedCategory === 'All') return true;
+    const name = b.serviceName || '';
+    if (selectedCategory === 'House Cleaning') return isHouseCleaning(name);
+    if (selectedCategory === 'Vehicle Cleaning') return isVehicleCleaning(name);
+    return true;
+  });
+
+  const activeCount = filteredBookings.filter(b => ['confirmed', 'assigned', 'on-the-way', 'in-progress'].includes((b.status || '').toLowerCase())).length;
+  const pendingCount = filteredBookings.filter(b => (b.status || '').toLowerCase() === 'pending').length;
+  const completedCount = filteredBookings.filter(b => (b.status || '').toLowerCase() === 'completed').length;
+  const totalBookings = filteredBookings.length;
 
   useEffect(() => {
     let isMounted = true;
@@ -54,7 +67,9 @@ const Bookings = () => {
           <p className="text-sm text-slate-500 dark:text-slate-400">Manage, track, and review all customer service requests across regions.</p>
         </div>
 
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-3 flex-wrap justify-end">
+          <BookingFilter selectedCategory={selectedCategory} onChange={setSelectedCategory} />
+          
           {isOffline && (
             <div className="flex items-center gap-1.5 rounded-xl bg-amber-50 dark:bg-amber-950/30 px-3.5 py-2 text-xs font-bold text-amber-700 dark:text-amber-500 border border-amber-100/50 dark:border-amber-900/40 shadow-xs">
               <WifiOff className="h-4 w-4 shrink-0" />
@@ -160,7 +175,7 @@ const Bookings = () => {
           <p className="text-sm font-semibold">Loading real-time bookings from AWS DynamoDB...</p>
         </div>
       ) : (
-        <BookingsTable bookings={bookings} />
+        <BookingsTable bookings={filteredBookings} />
       )}
     </div>
   );
