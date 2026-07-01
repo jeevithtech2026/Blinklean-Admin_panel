@@ -1,6 +1,7 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { ShieldAlert, ArrowUpDown, ChevronLeft, ChevronRight, Search, UserCircle, MapPin, Phone, Calendar } from 'lucide-react';
 import { useTheme } from '../context/ThemeContext';
+import ExportButton from './ExportButton';
 
 const CustomersTable = ({ customers }) => {
   const { density } = useTheme();
@@ -61,18 +62,32 @@ const CustomersTable = ({ customers }) => {
   const bodyTextSize = isCompact ? 'text-xs' : 'text-sm';
   const avatarSize = isCompact ? 'h-7 w-7 text-xs rounded-lg' : 'h-9 w-9 text-sm rounded-xl';
 
+  const exportData = async () => {
+    return filteredCustomers.map(c => ({
+      Customer_ID: c.userId || c.id || 'N/A',
+      Name: c.name || 'Anonymous User',
+      Email: c.email || 'N/A',
+      Phone: c.phone || 'N/A',
+      Location: c.city || c.address || 'Unknown',
+      Registered_Date: c.createdAt ? new Date(c.createdAt).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' }) : 'N/A'
+    }));
+  };
+
   return (
     <div className="space-y-4">
-      {/* Search */}
-      <div className="rounded-2xl border border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-900 p-4 shadow-sm flex items-center gap-3">
-        <Search className="h-4.5 w-4.5 text-slate-400 dark:text-slate-500 shrink-0" />
-        <input
-          type="text"
-          placeholder="Search customers by name, email, phone or user ID..."
-          value={searchQuery}
-          onChange={(e) => setSearchQuery(e.target.value)}
-          className="w-full bg-transparent text-sm text-slate-700 dark:text-slate-350 outline-none placeholder-slate-400 dark:placeholder-slate-600"
-        />
+      {/* Search and Export */}
+      <div className="rounded-2xl border border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-900 p-4 shadow-sm flex flex-col sm:flex-row items-center justify-between gap-4">
+        <div className="flex items-center gap-3 w-full sm:w-auto">
+          <Search className="h-4.5 w-4.5 text-slate-400 dark:text-slate-500 shrink-0" />
+          <input
+            type="text"
+            placeholder="Search customers by name, email, phone or user ID..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="w-full sm:w-80 bg-transparent text-sm text-slate-700 dark:text-slate-350 outline-none placeholder-slate-400 dark:placeholder-slate-600"
+          />
+        </div>
+        <ExportButton type="Customers" getData={exportData} />
       </div>
 
       {/* Table */}
