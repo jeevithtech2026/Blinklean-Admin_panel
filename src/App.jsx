@@ -15,6 +15,7 @@ import Payouts from './pages/Payouts';
 import Customers from './pages/Customers';
 import Services from './pages/Services';
 import Coupons from './pages/Coupons';
+import VerificationCodes from './pages/VerificationCodes';
 import Feedbacks from './pages/Feedbacks';
 import PartnerTracking from './pages/PartnerTracking';
 import LogisticsAnalytics from './pages/LogisticsAnalytics';
@@ -55,6 +56,7 @@ function App() {
                   <Route path="payouts" element={<Payouts />} />
                   <Route path="services" element={<Services />} />
                   <Route path="coupons" element={<Coupons />} />
+                  <Route path="verification-codes" element={<VerificationCodes />} />
                   <Route path="feedbacks" element={<Feedbacks />} />
                   <Route path="tracking" element={<PartnerTracking />} />
                   <Route path="logistics" element={<LogisticsAnalytics />} />

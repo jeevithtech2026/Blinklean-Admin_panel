@@ -510,4 +510,98 @@ router.get('/system-alerts', async (req, res) => {
   }
 });
 
+// ─── VERIFICATION CODES ───────────────────────────────────────────────────────
+
+// POST /api/v1/data/verification-codes - Generate a new verification code
+router.post('/verification-codes', async (req, res) => {
+  try {
+    const { category } = req.body;
+    
+    if (!category) {
+      return res.status(400).json({ success: false, error: 'Category is required' });
+    }
+    
+    // Generate 6-char random alphanumeric code
+    const code = Math.random().toString(36).substring(2, 8).toUpperCase();
+    
+    const newCode = {
+      code,
+      category,
+      status: 'active',
+      createdAt: new Date().toISOString(),
+      usedBy: null
+    };
+    
+    await dynamoDB.send(new PutCommand({
+      TableName: 'VerificationCodes',
+      Item: newCode
+    }));
+    
+    res.json({ success: true, data: newCode });
+  } catch (err) {
+    console.error('[VerificationCodes] Generate error:', err.message);
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// GET /api/v1/data/verification-codes - List all verification codes
+router.get('/verification-codes', async (req, res) => {
+  try {
+    const result = await dynamoDB.send(new ScanCommand({ TableName: 'VerificationCodes' }));
+    res.json({ success: true, count: result.Count, data: result.Items });
+  } catch (err) {
+    console.error('[VerificationCodes] List error:', err.message);
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// POST /api/v1/data/verification-codes/validate - Validate a verification code (for Partner App)
+router.post('/verification-codes/validate', async (req, res) => {
+  try {
+    const { code, category } = req.body;
+    
+    if (!code || !category) {
+      return res.status(400).json({ success: false, error: 'Code and category are required' });
+    }
+    
+    const result = await dynamoDB.send(new GetCommand({
+      TableName: 'VerificationCodes',
+      Key: { code: code.toUpperCase() }
+    }));
+    
+    const record = result.Item;
+    
+    if (!record) {
+      return res.status(404).json({ success: false, error: 'Invalid verification code' });
+    }
+    
+    if (record.category !== category) {
+      return res.status(400).json({ success: false, error: `This code is not valid for ${category} registration` });
+    }
+    
+    if (record.status !== 'active') {
+      return res.status(400).json({ success: false, error: 'This verification code has already been used or is inactive' });
+    }
+    
+    // Mark as used (optional: the partner app might call a separate endpoint after full registration to mark it used, 
+    // but we can mark it used here or just return success and let the registration flow handle marking it).
+    // Let's mark it as used immediately upon validation for security.
+    await dynamoDB.send(new UpdateCommand({
+      TableName: 'VerificationCodes',
+      Key: { code: record.code },
+      UpdateExpression: 'SET #st = :status, usedAt = :usedAt',
+      ExpressionAttributeNames: { '#st': 'status' },
+      ExpressionAttributeValues: {
+        ':status': 'used',
+        ':usedAt': new Date().toISOString()
+      }
+    }));
+    
+    res.json({ success: true, message: 'Verification successful' });
+  } catch (err) {
+    console.error('[VerificationCodes] Validate error:', err.message);
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
 module.exports = router;

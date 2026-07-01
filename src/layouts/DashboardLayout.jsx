@@ -19,6 +19,7 @@ const DashboardLayout = () => {
     { name: 'Customer Directory', path: '/dashboard/customers', icon: Users },
     { name: 'Partner Management', path: '/dashboard/partners', icon: User },
     { name: 'Partner Schedules', path: '/dashboard/tracking', icon: MapPin },
+    { name: 'Verification Codes', path: '/dashboard/verification-codes', icon: ShieldCheck },
     { name: 'Service Bookings', path: '/dashboard/bookings', icon: Calendar },
     { name: 'Financials & Payments', path: '/dashboard/financials', icon: IndianRupee },
     { name: 'Partner Payouts', path: '/dashboard/payouts', icon: Wallet },
