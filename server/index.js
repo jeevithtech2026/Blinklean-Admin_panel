@@ -7,6 +7,7 @@ const adminRoutes = require('./routes/admin');
 const healthRoutes = require('./routes/health');
 const dataRoutes = require('./routes/data');
 const authRoutes = require('./routes/auth');
+const webhookRoutes = require('./routes/webhooks');
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -35,6 +36,9 @@ app.use('/api/v1/data', dataRoutes);
 
 // Auth routes for Cognito admin login
 app.use('/api/v1/auth', authRoutes);
+
+// Public webhook routes (e.g., Razorpay)
+app.use('/api/v1/webhooks', webhookRoutes);
 
 // 6. Basic service health validation endpoint
 app.get('/health', (req, res) => {

@@ -27,6 +27,10 @@ Parameters:
     Type: String
     Description: ARN of the AWS Secrets Manager Secret storing DB connection credentials.
 
+  RazorpayWebhookSecret:
+    Type: String
+    Description: Secret for validating incoming Razorpay webhook payloads.
+
 Resources:
   # ==============================================================================
   # 1. API Gateway REST API with CORS configured
@@ -60,6 +64,7 @@ Resources:
           PARTNER_DB_HOST: !Ref PartnerDbEndpoint
           DB_SECRETS_ARN: !Ref DatabaseSecretsArn
           JWT_SECRET_NAME: "blinklean/admin/jwt"
+          RAZORPAY_WEBHOOK_SECRET: !Ref RazorpayWebhookSecret
 
       # Access Policies configuration
       Policies:

@@ -10,6 +10,7 @@ import Login from './pages/Login';
 import Dashboard from './pages/Dashboard';
 import Partners from './pages/Partners';
 import Bookings from './pages/Bookings';
+import Financials from './pages/Financials';
 import Customers from './pages/Customers';
 import Services from './pages/Services';
 import Coupons from './pages/Coupons';
@@ -49,6 +50,7 @@ function App() {
                   <Route path="customers" element={<Customers />} />
                   <Route path="partners" element={<Partners />} />
                   <Route path="bookings" element={<Bookings />} />
+                  <Route path="financials" element={<Financials />} />
                   <Route path="services" element={<Services />} />
                   <Route path="coupons" element={<Coupons />} />
                   <Route path="feedbacks" element={<Feedbacks />} />

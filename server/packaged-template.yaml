@@ -23,6 +23,9 @@ Parameters:
     Type: String
     Description: ARN of the AWS Secrets Manager Secret storing DB connection 
       credentials.
+  RazorpayWebhookSecret:
+    Type: String
+    Description: Secret for validating incoming Razorpay webhook payloads.
 Resources:
   AdminGatewayApi:
     Type: AWS::Serverless::Api
@@ -37,7 +40,7 @@ Resources:
     Type: AWS::Serverless::Function
     Properties:
       CodeUri: 
-        s3://amplify-blinklean-dev-4c300-deployment/34b1a8184e60b877bbe4a3b3c357c457
+        s3://amplify-blinklean-dev-4c300-deployment/e44a816b50f07d9b85670b12ed4a2cc2
       Handler: lambda.handler
       Runtime: nodejs18.x
       Timeout: 15
@@ -53,6 +56,8 @@ Resources:
           DB_SECRETS_ARN:
             Ref: DatabaseSecretsArn
           JWT_SECRET_NAME: blinklean/admin/jwt
+          RAZORPAY_WEBHOOK_SECRET:
+            Ref: RazorpayWebhookSecret
       Policies:
       - AWSSecretsManagerGetSecretValuePolicy:
           SecretArn:
