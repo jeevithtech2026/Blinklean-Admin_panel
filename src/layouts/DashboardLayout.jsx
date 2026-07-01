@@ -5,7 +5,7 @@ import SystemHealthBanner from '../components/SystemHealthBanner';
 import SettingsPanel from '../components/SettingsPanel';
 import { 
   LayoutDashboard, Users, Truck, LogOut, Calendar, ListPlus, Tag, MessageSquare, MapPin,
-  Menu, X, Bell, User, Search, ShieldCheck, Database, Gauge, Archive, Lock, Bug, Key, IndianRupee
+  Menu, X, Bell, User, Search, ShieldCheck, Database, Gauge, Archive, Lock, Bug, Key, IndianRupee, Wallet
 } from 'lucide-react';
 
 const DashboardLayout = () => {
@@ -21,6 +21,7 @@ const DashboardLayout = () => {
     { name: 'Partner Schedules', path: '/dashboard/tracking', icon: MapPin },
     { name: 'Service Bookings', path: '/dashboard/bookings', icon: Calendar },
     { name: 'Financials & Payments', path: '/dashboard/financials', icon: IndianRupee },
+    { name: 'Partner Payouts', path: '/dashboard/payouts', icon: Wallet },
     { name: 'Service Catalog', path: '/dashboard/services', icon: ListPlus },
     { name: 'Discounts & Promos', path: '/dashboard/coupons', icon: Tag },
     { name: 'Customer Feedback', path: '/dashboard/feedbacks', icon: MessageSquare },

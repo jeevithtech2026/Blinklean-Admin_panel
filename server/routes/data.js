@@ -165,6 +165,34 @@ router.put('/partners/:id/bank', async (req, res) => {
   }
 });
 
+// POST /api/v1/admin/partners/:id/payout - Process payout for a partner
+router.post('/partners/:id/payout', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { amount } = req.body;
+
+    if (!amount || isNaN(amount) || amount <= 0) {
+      return res.status(400).json({ success: false, error: 'Valid payout amount is required' });
+    }
+
+    await dynamoDB.send(new UpdateCommand({
+      TableName: 'Partners',
+      Key: { id },
+      UpdateExpression: 'SET paidAmount = if_not_exists(paidAmount, :zero) + :amount, lastPayoutDate = :now, updatedAt = :now',
+      ExpressionAttributeValues: {
+        ':zero': 0,
+        ':amount': Number(amount),
+        ':now': new Date().toISOString()
+      }
+    }));
+
+    res.json({ success: true, message: 'Payout successfully recorded' });
+  } catch (err) {
+    console.error('[Partners] Payout Process error:', err.message);
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
 // ─── BOOKINGS ─────────────────────────────────────────────────────────────────
 
 // GET /api/v1/admin/bookings - List all bookings
