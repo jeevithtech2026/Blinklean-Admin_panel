@@ -1,0 +1,89 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: "AWS SAM Template for BlinkLean Admin Panel API Aggregation Service.
+  Deploys the Express server backend inside a Serverless Lambda behind API Gateway.\n"
+Parameters:
+  Environment:
+    Type: String
+    Default: production
+    AllowedValues:
+    - development
+    - staging
+    - production
+    Description: Deployment stage environment.
+  CustomerDbEndpoint:
+    Type: String
+    Default: customer-rds-cluster.internal.rds.amazonaws.com
+    Description: Customer DB DNS endpoint hostname.
+  PartnerDbEndpoint:
+    Type: String
+    Default: partner-rds-cluster.internal.rds.amazonaws.com
+    Description: Partner DB DNS endpoint hostname.
+  DatabaseSecretsArn:
+    Type: String
+    Description: ARN of the AWS Secrets Manager Secret storing DB connection 
+      credentials.
+  RazorpayWebhookSecret:
+    Type: String
+    Description: Secret for validating incoming Razorpay webhook payloads.
+Resources:
+  AdminGatewayApi:
+    Type: AWS::Serverless::Api
+    Properties:
+      StageName:
+        Ref: Environment
+      Cors:
+        AllowMethods: "'GET,POST,PUT,DELETE,OPTIONS'"
+        AllowHeaders: "'Content-Type,Authorization'"
+        AllowOrigin: "'*'"
+  AdminAggregationFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: 
+        s3://amplify-blinklean-dev-4c300-deployment/e44a816b50f07d9b85670b12ed4a2cc2
+      Handler: lambda.handler
+      Runtime: nodejs18.x
+      Timeout: 15
+      MemorySize: 512
+      Environment:
+        Variables:
+          NODE_ENV:
+            Ref: Environment
+          CUSTOMER_DB_HOST:
+            Ref: CustomerDbEndpoint
+          PARTNER_DB_HOST:
+            Ref: PartnerDbEndpoint
+          DB_SECRETS_ARN:
+            Ref: DatabaseSecretsArn
+          JWT_SECRET_NAME: blinklean/admin/jwt
+          RAZORPAY_WEBHOOK_SECRET:
+            Ref: RazorpayWebhookSecret
+      Policies:
+      - AWSSecretsManagerGetSecretValuePolicy:
+          SecretArn:
+            Ref: DatabaseSecretsArn
+      Events:
+        ProxyApiGreedy:
+          Type: Api
+          Properties:
+            RestApiId:
+              Ref: AdminGatewayApi
+            Path: /{proxy+}
+            Method: ANY
+        ProxyApiRoot:
+          Type: Api
+          Properties:
+            RestApiId:
+              Ref: AdminGatewayApi
+            Path: /
+            Method: ANY
+Outputs:
+  AdminApiUrl:
+    Description: Production API Gateway URL endpoint for the BlinkLean Admin 
+      backend service
+    Value:
+      Fn::Sub: 
+        https://${AdminGatewayApi}.execute-api.${AWS::Region}.amazonaws.com/${Environment}/
+    Export:
+      Name:
+        Fn::Sub: ${AWS::StackName}-AdminApiUrl

@@ -1,16 +1,24 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Users, UserCheck, Calendar, CheckCircle2, BarChart3, WifiOff, AlertTriangle } from 'lucide-react';
+import { Users, UserCheck, Calendar, CheckCircle2, BarChart3, WifiOff, AlertTriangle, MapPin } from 'lucide-react';
 import KpiCard from '../components/ui/KpiCard';
-import HighestRatedServices from '../components/HighestRatedServices';
 import RefreshController from '../components/ui/RefreshController';
-import LiveActivityStream from '../components/ui/LiveActivityStream';
 import axiosInstance from '../api/axiosInstance';
+
+import CompletedBookingsList from '../components/CompletedBookingsList';
+import DiscountCouponsPanel from '../components/DiscountCouponsPanel';
+import FinancialsPaymentsPanel from '../components/FinancialsPaymentsPanel';
+
+import Customers from './Customers';
+import Partners from './Partners';
+import PartnerTracking from './PartnerTracking';
+import Bookings from './Bookings';
 
 const Dashboard = () => {
   const [loading, setLoading] = useState(true);
   const [isOffline, setIsOffline] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
   const [frequency, setFrequency] = useState(0); // auto-refresh frequency in seconds, 0 = Off
+  const [activeTab, setActiveTab] = useState('overview'); // 'overview' | 'customers' | 'partners' | 'tracking' | 'bookings'
   
   const [metrics, setMetrics] = useState({
     customers: { title: 'Total Registered Customers', value: '0', trend: '', isPositive: true, icon: Users },
@@ -93,17 +101,19 @@ const Dashboard = () => {
               <span>Mock Database Offline Active</span>
             </div>
           )}
-          <RefreshController 
-            onRefresh={fetchDashboardSummary} 
-            loading={loading}
-            frequency={frequency}
-            setFrequency={setFrequency}
-          />
+          {activeTab === 'overview' && (
+            <RefreshController 
+              onRefresh={fetchDashboardSummary} 
+              loading={loading}
+              frequency={frequency}
+              setFrequency={setFrequency}
+            />
+          )}
         </div>
       </div>
 
       {/* Network Alert Notification */}
-      {errorMsg && (
+      {errorMsg && activeTab === 'overview' && (
         <div className="flex items-start gap-3 rounded-xl bg-rose-50 border border-rose-100 dark:border-rose-900/30 p-4 text-xs font-semibold text-rose-700 dark:text-rose-450">
           <AlertTriangle className="h-4.5 w-4.5 text-rose-600 dark:text-rose-400 shrink-0 mt-0.5" />
           <div>
@@ -113,81 +123,124 @@ const Dashboard = () => {
         </div>
       )}
 
-      {/* KPI Cards Grid */}
-      <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
-        <KpiCard
-          title={metrics.customers.title}
-          value={metrics.customers.value}
-          trend={metrics.customers.trend}
-          isPositive={metrics.customers.isPositive}
-          icon={metrics.customers.icon}
-          loading={loading}
-        />
-        <KpiCard
-          title={metrics.partners.title}
-          value={metrics.partners.value}
-          trend={metrics.partners.trend}
-          isPositive={metrics.partners.isPositive}
-          icon={metrics.partners.icon}
-          loading={loading}
-        />
-        <KpiCard
-          title={metrics.bookings.title}
-          value={metrics.bookings.value}
-          trend={metrics.bookings.trend}
-          isPositive={metrics.bookings.isPositive}
-          icon={metrics.bookings.icon}
-          loading={loading}
-        />
-        <KpiCard
-          title={metrics.completions.title}
-          value={metrics.completions.value}
-          trend={metrics.completions.trend}
-          isPositive={metrics.completions.isPositive}
-          icon={metrics.completions.icon}
-          loading={loading}
-        />
+      {/* Tabs Navigation */}
+      <div className="flex gap-2 p-1 bg-slate-100 dark:bg-slate-800/50 rounded-xl w-max border border-slate-200 dark:border-slate-800 overflow-x-auto max-w-full">
+        <button
+          onClick={() => setActiveTab('overview')}
+          className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold transition-all cursor-pointer ${
+            activeTab === 'overview'
+              ? 'bg-white dark:bg-slate-900 text-slate-900 dark:text-white shadow-xs border border-slate-200 dark:border-slate-700'
+              : 'text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-300'
+          }`}
+        >
+          <BarChart3 className="h-4 w-4" /> Overview Summary
+        </button>
+        <button
+          onClick={() => setActiveTab('customers')}
+          className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold transition-all cursor-pointer ${
+            activeTab === 'customers'
+              ? 'bg-white dark:bg-slate-900 text-slate-900 dark:text-white shadow-xs border border-slate-200 dark:border-slate-700'
+              : 'text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-300'
+          }`}
+        >
+          <Users className="h-4 w-4" /> Customer Directory
+        </button>
+        <button
+          onClick={() => setActiveTab('partners')}
+          className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold transition-all cursor-pointer ${
+            activeTab === 'partners'
+              ? 'bg-white dark:bg-slate-900 text-slate-900 dark:text-white shadow-xs border border-slate-200 dark:border-slate-700'
+              : 'text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-300'
+          }`}
+        >
+          <UserCheck className="h-4 w-4" /> Partner Management
+        </button>
+        <button
+          onClick={() => setActiveTab('tracking')}
+          className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold transition-all cursor-pointer ${
+            activeTab === 'tracking'
+              ? 'bg-white dark:bg-slate-900 text-slate-900 dark:text-white shadow-xs border border-slate-200 dark:border-slate-700'
+              : 'text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-300'
+          }`}
+        >
+          <MapPin className="h-4 w-4" /> Partner Schedules
+        </button>
+        <button
+          onClick={() => setActiveTab('bookings')}
+          className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold transition-all cursor-pointer ${
+            activeTab === 'bookings'
+              ? 'bg-white dark:bg-slate-900 text-slate-900 dark:text-white shadow-xs border border-slate-200 dark:border-slate-700'
+              : 'text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-300'
+          }`}
+        >
+          <Calendar className="h-4 w-4" /> Service Bookings
+        </button>
       </div>
 
-      {/* Bottom Content Grid */}
-      <div className="grid gap-6 lg:grid-cols-3">
-        {/* Column 1: Highest Rated Services */}
-        <div className="lg:col-span-1">
-          <HighestRatedServices loading={loading} />
-        </div>
+      {/* Tab Content */}
+      <div className="mt-6">
+        {activeTab === 'overview' && (
+          <div className="space-y-6">
+            {/* KPI Cards Grid */}
+            <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
+              <KpiCard
+                title={metrics.customers.title}
+                value={metrics.customers.value}
+                trend={metrics.customers.trend}
+                isPositive={metrics.customers.isPositive}
+                icon={metrics.customers.icon}
+                loading={loading}
+              />
+              <KpiCard
+                title={metrics.partners.title}
+                value={metrics.partners.value}
+                trend={metrics.partners.trend}
+                isPositive={metrics.partners.isPositive}
+                icon={metrics.partners.icon}
+                loading={loading}
+              />
+              <KpiCard
+                title={metrics.bookings.title}
+                value={metrics.bookings.value}
+                trend={metrics.bookings.trend}
+                isPositive={metrics.bookings.isPositive}
+                icon={metrics.bookings.icon}
+                loading={loading}
+              />
+              <KpiCard
+                title={metrics.completions.title}
+                value={metrics.completions.value}
+                trend={metrics.completions.trend}
+                isPositive={metrics.completions.isPositive}
+                icon={metrics.completions.icon}
+                loading={loading}
+              />
+            </div>
 
-        {/* Column 2: Future Charts Placeholder */}
-        <div className="lg:col-span-1 rounded-2xl border border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-900 p-6 shadow-sm flex flex-col min-h-[350px] justify-between">
-          <div className="border-b border-slate-50 dark:border-slate-850 pb-4 mb-4">
-            <h2 className="text-lg font-bold text-slate-900 dark:text-white">Analytics Trends</h2>
-            <p className="text-xs text-slate-400 dark:text-slate-550">Reserved space for future visualization and interactive charts</p>
-          </div>
-
-          <div className="flex-1 flex flex-col items-center justify-center border-2 border-dashed border-slate-100 dark:border-slate-800 rounded-xl bg-slate-50/50 dark:bg-slate-950/20 p-6 text-center">
-            {loading ? (
-              <div className="animate-pulse flex flex-col items-center space-y-3">
-                <div className="h-10 w-10 rounded-full bg-slate-200 dark:bg-slate-800"></div>
-                <div className="h-4 w-32 rounded bg-slate-200 dark:bg-slate-800"></div>
-                <div className="h-3 w-48 rounded bg-slate-100 dark:bg-slate-800"></div>
+            {/* Bottom Content Grid */}
+            <div className="grid gap-6 lg:grid-cols-3">
+              {/* Column 1: Completed Bookings */}
+              <div className="lg:col-span-1">
+                <CompletedBookingsList loading={loading} />
               </div>
-            ) : (
-              <>
-                <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-indigo-50 dark:bg-indigo-950/20 border border-indigo-100 dark:border-indigo-900/50 text-indigo-600 dark:text-indigo-400 mb-3 shadow-xs">
-                  <BarChart3 className="h-6 w-6" />
-                </div>
-                <h3 className="text-sm font-bold text-slate-800 dark:text-slate-350">Charts Visualization Area</h3>
-                <p className="text-xs text-slate-500 dark:text-slate-450 mt-1 max-w-xs leading-normal">
-                  Detailed analytics regarding order surges, customer acquisition, and partner ratings will be rendered here.
-                </p>
-              </>
-            )}
-          </div>
-        </div>
 
-        {/* Column 3: Live Real-Time Activity Stream */}
-        <div className="lg:col-span-1">
-          <LiveActivityStream />
-        </div>
+              {/* Column 2: Promo Coupons Summary */}
+              <div className="lg:col-span-1">
+                <DiscountCouponsPanel loading={loading} />
+              </div>
+
+              {/* Column 3: Financials & Payments */}
+              <div className="lg:col-span-1">
+                <FinancialsPaymentsPanel loading={loading} />
+              </div>
+            </div>
+          </div>
+        )}
+
+        {activeTab === 'customers' && <Customers />}
+        {activeTab === 'partners' && <Partners />}
+        {activeTab === 'tracking' && <PartnerTracking />}
+        {activeTab === 'bookings' && <Bookings />}
       </div>
     </div>
   );
