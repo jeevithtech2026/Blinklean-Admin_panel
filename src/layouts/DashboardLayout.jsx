@@ -4,8 +4,7 @@ import { useAuth } from '../context/AuthContext';
 import SystemHealthBanner from '../components/SystemHealthBanner';
 import SettingsPanel from '../components/SettingsPanel';
 import { 
-  LayoutDashboard, Truck, LogOut, ListPlus, MessageSquare,
-  Menu, X, Bell, User, Search, ShieldCheck, Database, Gauge, Archive, Lock, Bug, Key, Wallet
+  LayoutDashboard, LogOut, Menu, X, Bell, User, Search
 } from 'lucide-react';
 
 const DashboardLayout = () => {
@@ -16,18 +15,6 @@ const DashboardLayout = () => {
 
   const menuItems = [
     { name: 'Overview Dashboard', path: '/dashboard', icon: LayoutDashboard },
-    { name: 'Verification Codes', path: '/dashboard/verification-codes', icon: ShieldCheck },
-    { name: 'Partner Payouts', path: '/dashboard/payouts', icon: Wallet },
-    { name: 'Service Catalog', path: '/dashboard/services', icon: ListPlus },
-    { name: 'Customer Feedback', path: '/dashboard/feedbacks', icon: MessageSquare },
-    { name: 'Logistics Analytics', path: '/dashboard/logistics', icon: Truck },
-    { name: 'Audit Logs', path: '/dashboard/audit-logs', icon: ShieldCheck },
-    { name: 'Disaster Recovery & Backups', path: '/dashboard/disaster-recovery', icon: Database },
-    { name: 'System Performance', path: '/dashboard/performance', icon: Gauge },
-    { name: 'Data Retention & Archival', path: '/dashboard/retention', icon: Archive },
-    { name: 'Rate Limiting & Security', path: '/dashboard/rate-limiting', icon: Lock },
-    { name: 'Dependency Security & CVEs', path: '/dashboard/security-audit', icon: Bug },
-    { name: 'Webhooks & Developer APIs', path: '/dashboard/webhooks', icon: Key },
   ];
 
   const handleLogout = () => {
