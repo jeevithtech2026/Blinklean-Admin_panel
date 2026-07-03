@@ -12,7 +12,16 @@ const { encrypt, decrypt } = require('../utils/encryption');
 router.get('/users', async (req, res) => {
   try {
     const result = await dynamoDB.send(new ScanCommand({ TableName: 'Users' }));
-    res.json({ success: true, count: result.Count, data: result.Items });
+    
+    // Filter out anonymous/incomplete user registrations (must have profileComplete, email, name, or phone)
+    const completedUsers = (result.Items || []).filter(user => 
+      user.profileComplete === true || 
+      (user.email && user.email.trim() !== '') || 
+      (user.name && user.name.trim() !== '') || 
+      (user.phone && user.phone.trim() !== '')
+    );
+
+    res.json({ success: true, count: completedUsers.length, data: completedUsers });
   } catch (err) {
     console.error('[Users] Scan error:', err.message);
     res.status(500).json({ success: false, error: err.message });
@@ -199,7 +208,14 @@ router.post('/partners/:id/payout', async (req, res) => {
 router.get('/bookings', async (req, res) => {
   try {
     const result = await dynamoDB.send(new ScanCommand({ TableName: 'bookings' }));
-    res.json({ success: true, count: result.Count, data: result.Items });
+    
+    // Filter out skeleton/empty booking records (must have customerName and status)
+    const realBookings = (result.Items || []).filter(b => 
+      b.customerName && b.customerName.trim() !== '' &&
+      b.status && b.status.trim() !== ''
+    );
+
+    res.json({ success: true, count: realBookings.length, data: realBookings });
   } catch (err) {
     console.error('[Bookings] Scan error:', err.message);
     res.status(500).json({ success: false, error: err.message });

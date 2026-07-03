@@ -23,14 +23,27 @@ router.get('/dashboard-summary', async (req, res) => {
       dynamoDB.send(new ScanCommand({ TableName: 'Services' }))
     ]);
 
-    customersCount = custResult.Count || 0;
+    // Filter out anonymous/incomplete user registrations from the count
+    const completedUsers = (custResult.Items || []).filter(user => 
+      user.profileComplete === true || 
+      (user.email && user.email.trim() !== '') || 
+      (user.name && user.name.trim() !== '') || 
+      (user.phone && user.phone.trim() !== '')
+    );
+    customersCount = completedUsers.length;
     partnersCount = partResult.Count || 0;
     
-    // Calculate active bookings based on real data
-    const active = (bookingsResult.Items || []).filter(b => ['confirmed', 'assigned', 'on-the-way', 'in-progress'].includes((b.status || '').toLowerCase())).length;
-    activeBookings = active > 0 ? active : bookingsResult.Count || 0; // Fallback to all if no active
+    // Filter out skeleton bookings
+    const realBookings = (bookingsResult.Items || []).filter(b => 
+      b.customerName && b.customerName.trim() !== '' &&
+      b.status && b.status.trim() !== ''
+    );
 
-    const completed = (bookingsResult.Items || []).filter(b => (b.status || '').toLowerCase() === 'completed').length;
+    // Calculate active bookings based on real data
+    const active = realBookings.filter(b => ['confirmed', 'assigned', 'on-the-way', 'in-progress'].includes((b.status || '').toLowerCase())).length;
+    activeBookings = active;
+
+    const completed = realBookings.filter(b => (b.status || '').toLowerCase() === 'completed').length;
     serviceCompletions = completed;
 
     res.status(200).json({
