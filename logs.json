@@ -1,0 +1,41 @@
+{
+    "events": [
+        {
+            "logStreamName": "2026/06/27/[$LATEST]3aae5eb7dee94a939f2bbc2327512dc8",
+            "timestamp": 1782530291487,
+            "message": "INIT_START Runtime Version: nodejs:18.v106\tRuntime Version ARN: arn:aws:lambda:ap-south-1::runtime:6142085c48f8ddf451e505bf20bb9ebc02a540b974a9898df948c22764025aaf\n",
+            "ingestionTime": 1782530294526,
+            "eventId": "39751753839114107354732358446663804796736808243339919360"
+        },
+        {
+            "logStreamName": "2026/06/27/[$LATEST]3aae5eb7dee94a939f2bbc2327512dc8",
+            "timestamp": 1782530291803,
+            "message": "START RequestId: 35bfc3e5-8835-4e56-b8b5-513451ce568a Version: $LATEST\n",
+            "ingestionTime": 1782530294526,
+            "eventId": "39751753846161142837468035359389091770893690479229730817"
+        },
+        {
+            "logStreamName": "2026/06/27/[$LATEST]3aae5eb7dee94a939f2bbc2327512dc8",
+            "timestamp": 1782530291804,
+            "message": "2026-06-27T03:18:11.804Z\t35bfc3e5-8835-4e56-b8b5-513451ce568a\tINFO\t[Lambda Init] Fetching database connection credentials from Secrets Manager: \"arn:aws:secretsmanager:ap-south-1:042467473830:secret:AdminPanel/DatabaseSecrets-mloSnJ\" in region: ap-south-1\n",
+            "ingestionTime": 1782530294526,
+            "eventId": "39751753846183443582666565982530627489166338840735711234"
+        },
+        {
+            "logStreamName": "2026/06/27/[$LATEST]3aae5eb7dee94a939f2bbc2327512dc8",
+            "timestamp": 1782530291823,
+            "message": "2026-06-27T03:18:11.823Z\t35bfc3e5-8835-4e56-b8b5-513451ce568a\tERROR\t(node:2) Warning: NodeVersionSupportWarning: The AWS SDK for JavaScript (v3)\nversions published after the first week of January 2027\nwill require node >=22. You are running node v18.20.8.\n\nTo continue receiving updates to AWS services, bug fixes,\nand security updates please upgrade to node >=22.\n\nMore information can be found at: https://a.co/c895JFp\n(Use `node --trace-warnings ...` to show where the warning was created)\n",
+            "ingestionTime": 1782530294526,
+            "eventId": "39751753846607157741438647822219806136346657709349339139"
+        },
+        {
+            "logStreamName": "2026/06/27/[$LATEST]3aae5eb7dee94a939f2bbc2327512dc8",
+            "timestamp": 1782530292005,
+            "message": "2026-06-27T03:18:12.005Z\t35bfc3e5-8835-4e56-b8b5-513451ce568a\tINFO\t[Lambda Init] Database and JWT credentials successfully injected into environment.\n",
+            "ingestionTime": 1782530294526,
+            "eventId": "39751753850665893367571221233979306861968659503437774852"
+        },
+        {
+            "logStreamName": "2026/06/27/[$LATEST]3aae5eb7dee94a939f2bbc2327512dc8",
+            "timestamp": 1782530292022,
+            "message": 
