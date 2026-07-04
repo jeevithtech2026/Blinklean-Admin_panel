@@ -115,7 +115,7 @@ const PartnerTable = ({ partners }) => {
                 <th className={thPadding} onClick={() => handleSort('city')}>
                   <div className="flex items-center gap-1.5 cursor-pointer">City {renderSortIndicator('city')}</div>
                 </th>
-                <th className={thPadding}>Skills</th>
+                <th className={thPadding}>Category & Skills</th>
                 <th className={thPadding} onClick={() => handleSort('status')}>
                   <div className="flex items-center gap-1.5 cursor-pointer">Status {renderSortIndicator('status')}</div>
                 </th>
@@ -137,6 +137,9 @@ const PartnerTable = ({ partners }) => {
                         <div>
                           <div className="font-bold text-slate-900 dark:text-white leading-tight">{partner.name || '—'}</div>
                           <div className="text-[10px] font-mono text-slate-400 dark:text-slate-500 mt-0.5">{partner.email || partner.id?.slice(0, 16) + '...'}</div>
+                          <div className="text-[10px] text-slate-500 dark:text-slate-400 mt-0.5 font-semibold">
+                            {partner.phoneNumber || partner.personalInfo?.phone || partner.phone || 'No Contact'}
+                          </div>
                         </div>
                       </div>
                     </td>
@@ -144,19 +147,26 @@ const PartnerTable = ({ partners }) => {
                     <td className={`${tdPadding} font-semibold text-slate-600 dark:text-slate-350`}>
                       {partner.city || '—'}
                     </td>
-                    {/* Skills */}
+                    {/* Category & Skills */}
                     <td className={tdPadding}>
-                      <div className="flex flex-wrap gap-1 max-w-[200px]">
-                        {(partner.skills || []).slice(0, 2).map((skill) => (
-                          <span key={skill} className="inline-block rounded-md px-1.5 py-0.5 text-[10px] font-semibold bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400">
-                            {skill}
-                          </span>
-                        ))}
-                        {(partner.skills || []).length > 2 && (
-                          <span className="inline-block rounded-md px-1.5 py-0.5 text-[10px] font-semibold bg-slate-100 dark:bg-slate-800 text-slate-500">
-                            +{partner.skills.length - 2}
+                      <div className="flex flex-col gap-1 max-w-[200px]">
+                        {(partner.selectedServiceType || partner.personalInfo?.selectedServiceType) && (
+                          <span className="inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[10px] font-bold bg-violet-50 dark:bg-violet-955/30 text-violet-700 dark:text-violet-400 border border-violet-100/50 dark:border-violet-900/30 w-fit">
+                            {partner.selectedServiceType || partner.personalInfo?.selectedServiceType}
                           </span>
                         )}
+                        <div className="flex flex-wrap gap-1">
+                          {(partner.skills || []).slice(0, 2).map((skill) => (
+                            <span key={skill} className="inline-block rounded-md px-1.5 py-0.5 text-[10px] font-semibold bg-slate-100 dark:bg-slate-800 text-slate-650 dark:text-slate-400">
+                              {skill}
+                            </span>
+                          ))}
+                          {(partner.skills || []).length > 2 && (
+                            <span className="inline-block rounded-md px-1.5 py-0.5 text-[10px] font-semibold bg-slate-100 dark:bg-slate-800 text-slate-500">
+                              +{partner.skills.length - 2}
+                            </span>
+                          )}
+                        </div>
                       </div>
                     </td>
                     {/* Status */}

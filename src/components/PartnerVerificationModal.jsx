@@ -108,7 +108,7 @@ const PartnerVerificationModal = ({ isOpen, onClose, partner, onUpdate }) => {
               </span>
               <div>
                 <span className="text-[10px] text-slate-400 dark:text-slate-500 font-bold block uppercase tracking-wider">Phone & Location</span>
-                <span className="text-sm font-bold text-slate-900 dark:text-white block mt-0.5">{partner.phoneNumber || '—'}</span>
+                <span className="text-sm font-bold text-slate-900 dark:text-white block mt-0.5">{partner.phoneNumber || partner.personalInfo?.phone || partner.phone || '—'}</span>
                 <span className="text-xs text-slate-500 dark:text-slate-400 mt-0.5 block flex items-center gap-0.5"><MapPin className="h-3.5 w-3.5 inline" /> {partner.city || '—'}</span>
               </div>
             </div>
@@ -118,17 +118,26 @@ const PartnerVerificationModal = ({ isOpen, onClose, partner, onUpdate }) => {
                 <Award className="h-5 w-5" />
               </span>
               <div>
-                <span className="text-[10px] text-slate-400 dark:text-slate-500 font-bold block uppercase tracking-wider">Skills / Categories</span>
-                <div className="flex flex-wrap gap-1 mt-1">
-                  {(partner.skills || []).length > 0 ? (
-                    partner.skills.map((skill) => (
-                      <span key={skill} className="inline-block rounded-md px-1.5 py-0.5 text-[10px] font-semibold bg-violet-50 dark:bg-violet-950 text-violet-650 dark:text-violet-300">
-                        {skill}
-                      </span>
-                    ))
-                  ) : (
-                    <span className="text-xs text-slate-500">None declared</span>
+                <span className="text-[10px] text-slate-400 dark:text-slate-500 font-bold block uppercase tracking-wider">Category & Skills</span>
+                <div className="flex flex-col gap-1.5 mt-1">
+                  {(partner.selectedServiceType || partner.personalInfo?.selectedServiceType) && (
+                    <span className="inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[10px] font-bold bg-violet-100 dark:bg-violet-950 text-violet-750 dark:text-violet-300 border border-violet-200/50 dark:border-violet-800/40 w-fit">
+                      {partner.selectedServiceType || partner.personalInfo?.selectedServiceType}
+                    </span>
                   )}
+                  <div className="flex flex-wrap gap-1">
+                    {(partner.skills || []).length > 0 ? (
+                      partner.skills.map((skill) => (
+                        <span key={skill} className="inline-block rounded-md px-1.5 py-0.5 text-[10px] font-semibold bg-slate-100 dark:bg-slate-800 text-slate-650 dark:text-slate-400">
+                          {skill}
+                        </span>
+                      ))
+                    ) : (
+                      !(partner.selectedServiceType || partner.personalInfo?.selectedServiceType) && (
+                        <span className="text-xs text-slate-500">None declared</span>
+                      )
+                    )}
+                  </div>
                 </div>
               </div>
             </div>

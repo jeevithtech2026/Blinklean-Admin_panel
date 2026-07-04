@@ -100,10 +100,17 @@ router.get('/partners', async (req, res) => {
   try {
     const result = await dynamoDB.send(new ScanCommand({ TableName: 'Partners' }));
     
-    // Decrypt sensitive bank details before sending to admin
+    // Decrypt sensitive bank details and normalize personalInfo fields before sending to admin
     const decryptedItems = (result.Items || []).map(partner => {
       if (partner.bankDetails && partner.bankDetails.accountNumber) {
         partner.bankDetails.accountNumber = decrypt(partner.bankDetails.accountNumber);
+      }
+      // Normalize phoneNumber and selectedServiceType from personalInfo if missing at root
+      if ((!partner.phoneNumber || partner.phoneNumber === "") && partner.personalInfo && partner.personalInfo.phone) {
+        partner.phoneNumber = partner.personalInfo.phone;
+      }
+      if (!partner.selectedServiceType && partner.personalInfo && partner.personalInfo.selectedServiceType) {
+        partner.selectedServiceType = partner.personalInfo.selectedServiceType;
       }
       return partner;
     });
@@ -124,12 +131,20 @@ router.get('/partners/:id', async (req, res) => {
     }));
     if (!result.Item) return res.status(404).json({ success: false, error: 'Partner not found' });
     
+    const partner = result.Item;
     // Decrypt sensitive bank details before sending to admin
-    if (result.Item.bankDetails && result.Item.bankDetails.accountNumber) {
-      result.Item.bankDetails.accountNumber = decrypt(result.Item.bankDetails.accountNumber);
+    if (partner.bankDetails && partner.bankDetails.accountNumber) {
+      partner.bankDetails.accountNumber = decrypt(partner.bankDetails.accountNumber);
+    }
+    // Normalize phoneNumber and selectedServiceType from personalInfo if missing at root
+    if ((!partner.phoneNumber || partner.phoneNumber === "") && partner.personalInfo && partner.personalInfo.phone) {
+      partner.phoneNumber = partner.personalInfo.phone;
+    }
+    if (!partner.selectedServiceType && partner.personalInfo && partner.personalInfo.selectedServiceType) {
+      partner.selectedServiceType = partner.personalInfo.selectedServiceType;
     }
     
-    res.json({ success: true, data: result.Item });
+    res.json({ success: true, data: partner });
   } catch (err) {
     console.error('[Partners] Get error:', err.message);
     res.status(500).json({ success: false, error: err.message });
