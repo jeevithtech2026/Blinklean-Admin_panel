@@ -16,19 +16,14 @@ const envPath = path.resolve(__dirname, '../.env');
 if (fs.existsSync(envPath)) {
   try {
     const envConfig = dotenv.parse(fs.readFileSync(envPath));
-    if (envConfig.COGNITO_USER_POOL_ID) {
-      userPoolId = envConfig.COGNITO_USER_POOL_ID;
-    }
-    if (envConfig.COGNITO_CLIENT_ID) {
-      clientId = envConfig.COGNITO_CLIENT_ID;
-    }
-    if (envConfig.COGNITO_CLIENT_SECRET) {
-      clientSecret = envConfig.COGNITO_CLIENT_SECRET;
-    }
-    if (envConfig.AWS_ACCESS_KEY_ID && envConfig.AWS_SECRET_ACCESS_KEY) {
+    userPoolId = process.env.COGNITO_USER_POOL_ID || envConfig.COGNITO_USER_POOL_ID;
+    clientId = process.env.COGNITO_CLIENT_ID || envConfig.COGNITO_CLIENT_ID;
+    clientSecret = process.env.COGNITO_CLIENT_SECRET !== undefined ? process.env.COGNITO_CLIENT_SECRET : envConfig.COGNITO_CLIENT_SECRET;
+    
+    if ((process.env.AWS_ACCESS_KEY_ID && process.env.AWS_SECRET_ACCESS_KEY) || (envConfig.AWS_ACCESS_KEY_ID && envConfig.AWS_SECRET_ACCESS_KEY)) {
       clientConfig.credentials = {
-        accessKeyId: envConfig.AWS_ACCESS_KEY_ID,
-        secretAccessKey: envConfig.AWS_SECRET_ACCESS_KEY,
+        accessKeyId: process.env.AWS_ACCESS_KEY_ID || envConfig.AWS_ACCESS_KEY_ID,
+        secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY || envConfig.AWS_SECRET_ACCESS_KEY,
       };
     }
   } catch (err) {

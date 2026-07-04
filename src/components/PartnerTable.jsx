@@ -1,7 +1,8 @@
 import React, { useState, useMemo, useEffect } from 'react';
-import { ShieldAlert, ArrowUpDown, ChevronLeft, ChevronRight, Search, CheckCircle, Clock, XCircle, Building2 } from 'lucide-react';
+import { ShieldAlert, ArrowUpDown, ChevronLeft, ChevronRight, Search, CheckCircle, Clock, XCircle, Building2, UserCheck } from 'lucide-react';
 import { useTheme } from '../context/ThemeContext';
 import BankDetailsModal from './BankDetailsModal';
+import PartnerVerificationModal from './PartnerVerificationModal';
 
 const PartnerTable = ({ partners }) => {
   const { density } = useTheme();
@@ -13,6 +14,9 @@ const PartnerTable = ({ partners }) => {
   const [rowsPerPage, setRowsPerPage] = useState(10);
   const [selectedPartner, setSelectedPartner] = useState(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [selectedVerifyPartner, setSelectedVerifyPartner] = useState(null);
+  const [isVerifyModalOpen, setIsVerifyModalOpen] = useState(false);
+  const [, forceUpdate] = useState(0);
 
   useEffect(() => {
     setCurrentPage(1);
@@ -164,7 +168,7 @@ const PartnerTable = ({ partners }) => {
                       {partner.createdAt ? new Date(partner.createdAt).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) : '—'}
                     </td>
                     {/* Actions */}
-                    <td className={`${tdPadding} text-right`}>
+                    <td className={`${tdPadding} text-right flex items-center justify-end gap-2`}>
                       <button 
                         onClick={() => {
                           setSelectedPartner(partner);
@@ -174,6 +178,16 @@ const PartnerTable = ({ partners }) => {
                       >
                         <Building2 className="h-3.5 w-3.5" />
                         Bank
+                      </button>
+                      <button 
+                        onClick={() => {
+                          setSelectedVerifyPartner(partner);
+                          setIsVerifyModalOpen(true);
+                        }}
+                        className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-slate-100 dark:bg-slate-800 hover:bg-violet-100 dark:hover:bg-violet-900/40 text-slate-700 dark:text-slate-300 hover:text-violet-700 dark:hover:text-violet-400 rounded-lg text-xs font-bold transition-colors"
+                      >
+                        <UserCheck className="h-3.5 w-3.5" />
+                        Verify
                       </button>
                     </td>
                   </tr>
@@ -231,6 +245,20 @@ const PartnerTable = ({ partners }) => {
           if (selectedPartner && selectedPartner.id === id) {
             selectedPartner.bankDetails = newBankDetails;
           }
+        }}
+      />
+
+      <PartnerVerificationModal 
+        isOpen={isVerifyModalOpen}
+        onClose={() => setIsVerifyModalOpen(false)}
+        partner={selectedVerifyPartner}
+        onUpdate={(id, newKycStatus, newStatus) => {
+          const index = partners.findIndex(p => p.id === id);
+          if (index !== -1) {
+            partners[index].kycStatus = newKycStatus;
+            partners[index].status = newStatus;
+          }
+          forceUpdate(x => x + 1);
         }}
       />
     </div>

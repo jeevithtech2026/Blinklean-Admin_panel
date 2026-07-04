@@ -174,6 +174,37 @@ router.put('/partners/:id/bank', async (req, res) => {
   }
 });
 
+// PUT /api/v1/admin/partners/:id/verify - Update partner verification status manually
+router.put('/partners/:id/verify', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { kycStatus, status } = req.body;
+
+    if (!kycStatus) {
+      return res.status(400).json({ success: false, error: 'KYC Status is required' });
+    }
+
+    await dynamoDB.send(new UpdateCommand({
+      TableName: 'Partners',
+      Key: { id },
+      UpdateExpression: 'SET kycStatus = :kycStatus, #status = :status, updatedAt = :updatedAt',
+      ExpressionAttributeNames: {
+        '#status': 'status'
+      },
+      ExpressionAttributeValues: {
+        ':kycStatus': kycStatus,
+        ':status': status || (kycStatus === 'approved' ? 'active' : 'pending'),
+        ':updatedAt': new Date().toISOString()
+      }
+    }));
+
+    res.json({ success: true, message: 'Partner verification status updated successfully' });
+  } catch (err) {
+    console.error('[Partners] Verification Update error:', err.message);
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
 // POST /api/v1/admin/partners/:id/payout - Process payout for a partner
 router.post('/partners/:id/payout', async (req, res) => {
   try {
