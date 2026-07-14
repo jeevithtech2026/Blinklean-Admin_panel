@@ -13,6 +13,9 @@ let clientSecret = process.env.COGNITO_CLIENT_SECRET;
 
 // Parse server/.env file directly if it exists to override defaults
 const envPath = path.resolve(__dirname, '../.env');
+const isLambda = !!process.env.AWS_LAMBDA_FUNCTION_NAME;
+const isProduction = process.env.NODE_ENV === 'production';
+
 if (fs.existsSync(envPath)) {
   try {
     const envConfig = dotenv.parse(fs.readFileSync(envPath));
@@ -20,27 +23,32 @@ if (fs.existsSync(envPath)) {
     clientId = process.env.COGNITO_CLIENT_ID || envConfig.COGNITO_CLIENT_ID;
     clientSecret = process.env.COGNITO_CLIENT_SECRET !== undefined ? process.env.COGNITO_CLIENT_SECRET : envConfig.COGNITO_CLIENT_SECRET;
     
-    if ((process.env.AWS_ACCESS_KEY_ID && process.env.AWS_SECRET_ACCESS_KEY) || (envConfig.AWS_ACCESS_KEY_ID && envConfig.AWS_SECRET_ACCESS_KEY)) {
-      clientConfig.credentials = {
-        accessKeyId: process.env.AWS_ACCESS_KEY_ID || envConfig.AWS_ACCESS_KEY_ID,
-        secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY || envConfig.AWS_SECRET_ACCESS_KEY,
-      };
+    // Only load credentials from local file if not running on AWS Lambda/Production
+    if (!isLambda && !isProduction) {
+      if (envConfig.AWS_ACCESS_KEY_ID && envConfig.AWS_SECRET_ACCESS_KEY) {
+        clientConfig.credentials = {
+          accessKeyId: envConfig.AWS_ACCESS_KEY_ID,
+          secretAccessKey: envConfig.AWS_SECRET_ACCESS_KEY,
+        };
+      }
     }
   } catch (err) {
     console.error('[Cognito Config] Failed to parse local .env file:', err.message);
   }
 }
 
-// Fallback to process.env for credentials if needed
-if (!clientConfig.credentials && process.env.AWS_ACCESS_KEY_ID && process.env.AWS_SECRET_ACCESS_KEY) {
-  const credentials = {
-    accessKeyId: process.env.AWS_ACCESS_KEY_ID,
-    secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY,
-  };
-  if (process.env.AWS_SESSION_TOKEN) {
-    credentials.sessionToken = process.env.AWS_SESSION_TOKEN;
+// Fallback to process.env for credentials if needed (only in local non-production environment)
+if (!isLambda && !isProduction) {
+  if (!clientConfig.credentials && process.env.AWS_ACCESS_KEY_ID && process.env.AWS_SECRET_ACCESS_KEY) {
+    const credentials = {
+      accessKeyId: process.env.AWS_ACCESS_KEY_ID,
+      secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY,
+    };
+    if (process.env.AWS_SESSION_TOKEN) {
+      credentials.sessionToken = process.env.AWS_SESSION_TOKEN;
+    }
+    clientConfig.credentials = credentials;
   }
-  clientConfig.credentials = credentials;
 }
 
 const cognitoClient = new CognitoIdentityProviderClient(clientConfig);

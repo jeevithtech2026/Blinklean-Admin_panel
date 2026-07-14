@@ -62,6 +62,20 @@ Resources:
       - AWSSecretsManagerGetSecretValuePolicy:
           SecretArn:
             Ref: DatabaseSecretsArn
+      - Statement:
+        - Effect: Allow
+          Action:
+          - dynamodb:BatchGetItem
+          - dynamodb:BatchWriteItem
+          - dynamodb:GetItem
+          - dynamodb:PutItem
+          - dynamodb:UpdateItem
+          - dynamodb:DeleteItem
+          - dynamodb:Query
+          - dynamodb:Scan
+          Resource:
+          - Fn::Sub: arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/*
+          - Fn::Sub: arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/*/index/*
       Events:
         ProxyApiGreedy:
           Type: Api

@@ -76,6 +76,21 @@ Resources:
         # Permitting Lambda to read credentials securely from Secrets Manager at runtime
         - AWSSecretsManagerGetSecretValuePolicy:
             SecretArn: !Ref DatabaseSecretsArn
+        # Permitting Lambda to read/write DynamoDB tables in the deployment account and region
+        - Statement:
+            - Effect: Allow
+              Action:
+                - dynamodb:BatchGetItem
+                - dynamodb:BatchWriteItem
+                - dynamodb:GetItem
+                - dynamodb:PutItem
+                - dynamodb:UpdateItem
+                - dynamodb:DeleteItem
+                - dynamodb:Query
+                - dynamodb:Scan
+              Resource:
+                - !Sub 'arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/*'
+                - !Sub 'arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/*/index/*'
 
       Events:
         # Proxy all incoming traffic greedily to the Express Routing Framework
