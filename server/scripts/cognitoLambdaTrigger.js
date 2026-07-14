@@ -1,50 +1,95 @@
 const { DynamoDBClient } = require('@aws-sdk/client-dynamodb');
-const { DynamoDBDocumentClient, PutCommand } = require('@aws-sdk/lib-dynamodb');
+const { DynamoDBDocumentClient, UpdateCommand } = require('@aws-sdk/lib-dynamodb');
 
 const REGION = process.env.REGION || 'ap-south-1';
-const TABLE_NAME = 'Users';
 
 const dbClient = new DynamoDBClient({ region: REGION });
 const dynamoDB = DynamoDBDocumentClient.from(dbClient);
+
+function generateMockPhone() {
+    const digits = Math.floor(100000000 + Math.random() * 900000000);
+    return `+91 9${digits}`;
+}
 
 /**
  * AWS Lambda Post Confirmation Trigger for Amazon Cognito.
  * This function will be triggered immediately after a user signs up and confirms their account,
  * or logs in via a social provider like Google for the first time.
+ * Supports routing Cognito users from both Customer and Partner user pools.
  */
 exports.handler = async (event) => {
     console.log("Received Cognito Event:", JSON.stringify(event, null, 2));
 
     try {
-        const userAttributes = event.request.userAttributes;
+        const userAttributes = event.request.userAttributes || {};
+        const userPoolId = event.userPoolId || '';
 
-        // Map Cognito User to DynamoDB Schema
-        const dynamoItem = {
-            userId: event.userName, // Unique Cognito ID (sub)
-            email: userAttributes.email || 'unknown@example.com',
-            name: userAttributes.name || userAttributes.email || event.userName,
-            phone: userAttributes.phone_number || '',
-            emailVerified: userAttributes.email_verified === 'true',
-            status: 'CONFIRMED', // Post confirmation means they are confirmed
-            createdAt: new Date().toISOString(),
-            lastLogin: new Date().toISOString(),
-            source: 'cognito_trigger'
-        };
+        // Check if event belongs to the Partner User Pool
+        const isPartnerPool = userPoolId.toLowerCase().includes('ys1vwrsjh');
 
-        // Write to DynamoDB
-        await dynamoDB.send(new PutCommand({
-            TableName: TABLE_NAME,
-            Item: dynamoItem
-        }));
+        if (isPartnerPool) {
+            console.log(`[Cognito Sync] Routing user ${event.userName} to Partners table.`);
+            
+            const email = userAttributes.email || 'unknown@example.com';
+            const name = userAttributes.name || email.split('@')[0] || event.userName;
+            const phone = userAttributes.phone_number || generateMockPhone();
 
-        console.log(`Successfully added user ${dynamoItem.email} to DynamoDB`);
+            await dynamoDB.send(new UpdateCommand({
+                TableName: 'Partners',
+                Key: { id: event.userName },
+                UpdateExpression: 'SET email = :email, #name = :name, phoneNumber = if_not_exists(phoneNumber, :phone), #status = if_not_exists(#status, :status), kycStatus = if_not_exists(kycStatus, :kycStatus), createdAt = if_not_exists(createdAt, :now), updatedAt = :now, isOnboardingComplete = if_not_exists(isOnboardingComplete, :falseVal), skills = if_not_exists(skills, :emptyList), vehicleDetails = if_not_exists(vehicleDetails, :nullVal), photoUrl = if_not_exists(photoUrl, :nullVal)',
+                ExpressionAttributeNames: {
+                    '#name': 'name',
+                    '#status': 'status'
+                },
+                ExpressionAttributeValues: {
+                    ':email': email,
+                    ':name': name,
+                    ':phone': phone,
+                    ':status': 'pending',
+                    ':kycStatus': 'pending',
+                    ':now': new Date().toISOString(),
+                    ':falseVal': false,
+                    ':emptyList': [],
+                    ':nullVal': null
+                }
+            }));
+
+            console.log(`Successfully added/updated partner ${email} in DynamoDB`);
+        } else {
+            console.log(`[Cognito Sync] Routing user ${event.userName} to Users table.`);
+            
+            const email = userAttributes.email || 'unknown@example.com';
+            const name = userAttributes.name || email.split('@')[0] || event.userName;
+            const phone = userAttributes.phone_number || generateMockPhone();
+
+            await dynamoDB.send(new UpdateCommand({
+                TableName: 'Users',
+                Key: { userId: event.userName },
+                UpdateExpression: 'SET email = :email, #name = :name, emailVerified = :emailVerified, #status = :status, lastLogin = :now, createdAt = if_not_exists(createdAt, :now), phone = if_not_exists(phone, :phone), #source = :source',
+                ExpressionAttributeNames: {
+                    '#name': 'name',
+                    '#status': 'status',
+                    '#source': 'source'
+                },
+                ExpressionAttributeValues: {
+                    ':email': email,
+                    ':name': name,
+                    ':emailVerified': userAttributes.email_verified === 'true',
+                    ':status': 'CONFIRMED',
+                    ':now': new Date().toISOString(),
+                    ':phone': phone,
+                    ':source': 'cognito_trigger'
+                }
+            }));
+
+            console.log(`Successfully added/updated user ${email} in DynamoDB`);
+        }
     } catch (error) {
         console.error("Error saving user to DynamoDB:", error);
-        // We throw the error so Cognito knows the trigger failed.
-        // If you don't want login to fail if DynamoDB fails, you can swallow the error.
+        // Throw the error so Cognito knows the trigger failed
         throw error;
     }
 
-    // Return the event to Cognito so it can proceed with the authentication flow
     return event;
 };

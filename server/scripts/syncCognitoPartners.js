@@ -4,12 +4,10 @@ const { CognitoIdentityProviderClient, ListUsersCommand } = require('@aws-sdk/cl
 const { DynamoDBClient } = require('@aws-sdk/client-dynamodb');
 const { DynamoDBDocumentClient, UpdateCommand } = require('@aws-sdk/lib-dynamodb');
 
-// Configuration
 const REGION = process.env.AWS_REGION || 'ap-south-1';
-const USER_POOL_ID = process.env.COGNITO_USER_POOL_ID || 'ap-south-1_cND29vJXJ';
-const TABLE_NAME = 'Users';
+const USER_POOL_ID = 'ap-south-1_yS1VWRSJh'; // Partner App User Pool
+const TABLE_NAME = 'Partners';
 
-// Initialize AWS Clients
 const cognitoClient = new CognitoIdentityProviderClient({ region: REGION });
 const dbClient = new DynamoDBClient({ region: REGION });
 const dynamoDB = DynamoDBDocumentClient.from(dbClient);
@@ -19,8 +17,8 @@ function generateMockPhone() {
   return `+91 9${digits}`;
 }
 
-async function syncUsers() {
-  console.log(`Starting synchronization of users from Cognito Pool [${USER_POOL_ID}] to DynamoDB Table [${TABLE_NAME}]...`);
+async function syncPartners() {
+  console.log(`Starting synchronization of partners from Cognito Pool [${USER_POOL_ID}] to DynamoDB Table [${TABLE_NAME}]...`);
   
   let paginationToken = undefined;
   let syncedCount = 0;
@@ -36,7 +34,6 @@ async function syncUsers() {
       const users = response.Users || [];
 
       for (const user of users) {
-        // Extract attributes (email, name, phone_number, etc.)
         const attributes = {};
         if (user.Attributes) {
           user.Attributes.forEach(attr => {
@@ -48,44 +45,42 @@ async function syncUsers() {
         const name = attributes.name || email.split('@')[0] || user.Username;
         const phone = attributes.phone_number || generateMockPhone();
         const createdAt = user.UserCreateDate ? user.UserCreateDate.toISOString() : new Date().toISOString();
-        const lastLogin = user.UserLastModifiedDate ? user.UserLastModifiedDate.toISOString() : null;
+        const updatedAt = user.UserLastModifiedDate ? user.UserLastModifiedDate.toISOString() : new Date().toISOString();
 
-        // Use UpdateCommand with if_not_exists to avoid overwriting existing customer profile progress
+        // Use UpdateCommand with if_not_exists to avoid overwriting existing partner progress
         await dynamoDB.send(new UpdateCommand({
           TableName: TABLE_NAME,
-          Key: { userId: user.Username },
-          UpdateExpression: 'SET email = :email, #name = :name, emailVerified = :emailVerified, #status = :status, lastLogin = :lastLogin, createdAt = if_not_exists(createdAt, :createdAt), phone = if_not_exists(phone, :phone), #source = :source',
+          Key: { id: user.Username },
+          UpdateExpression: 'SET email = :email, #name = :name, phoneNumber = if_not_exists(phoneNumber, :phone), #status = if_not_exists(#status, :status), kycStatus = if_not_exists(kycStatus, :kycStatus), createdAt = if_not_exists(createdAt, :createdAt), updatedAt = :updatedAt, isOnboardingComplete = if_not_exists(isOnboardingComplete, :isOnboardingComplete), skills = if_not_exists(skills, :skills), vehicleDetails = if_not_exists(vehicleDetails, :nullVal), photoUrl = if_not_exists(photoUrl, :nullVal)',
           ExpressionAttributeNames: {
             '#name': 'name',
-            '#status': 'status',
-            '#source': 'source'
+            '#status': 'status'
           },
           ExpressionAttributeValues: {
             ':email': email,
             ':name': name,
-            ':emailVerified': attributes.email_verified === 'true',
-            ':status': user.UserStatus,
-            ':lastLogin': lastLogin,
-            ':createdAt': createdAt,
             ':phone': phone,
-            ':source': 'cognito_sync'
+            ':status': 'pending',
+            ':kycStatus': 'pending',
+            ':createdAt': createdAt,
+            ':updatedAt': updatedAt,
+            ':isOnboardingComplete': false,
+            ':skills': [],
+            ':nullVal': null
           }
         }));
 
-        console.log(`Synced user: ${email} (${user.Username})`);
+        console.log(`Synced partner: ${email} (${user.Username})`);
         syncedCount++;
       }
 
       paginationToken = response.PaginationToken;
     } while (paginationToken);
 
-    console.log(`\n✅ Synchronization complete! Successfully synced ${syncedCount} users to DynamoDB.`);
+    console.log(`\n✅ Synchronization complete! Successfully synced ${syncedCount} partners to DynamoDB.`);
   } catch (error) {
-    console.error('❌ Error syncing users:', error.message);
-    if (error.name === 'CredentialsProviderError') {
-      console.error('Please ensure your AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY are correctly set in the server/.env file.');
-    }
+    console.error('❌ Error syncing partners:', error.message);
   }
 }
 
-syncUsers();
+syncPartners();
