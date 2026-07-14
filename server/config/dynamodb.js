@@ -8,6 +8,15 @@ const clientConfig = {
   region: process.env.AWS_REGION || 'ap-south-1',
 };
 
+// Prioritize credentials explicitly passed via environment variables (e.g., from Secrets Manager for cross-account access)
+if (process.env.DYNAMODB_ACCESS_KEY_ID && process.env.DYNAMODB_SECRET_ACCESS_KEY) {
+  clientConfig.credentials = {
+    accessKeyId: process.env.DYNAMODB_ACCESS_KEY_ID,
+    secretAccessKey: process.env.DYNAMODB_SECRET_ACCESS_KEY,
+  };
+  console.log('[DynamoDB Config] Injected cross-account credentials from environment/Secrets Manager');
+}
+
 // Only load AWS credentials from local file or process.env fallbacks if not running in AWS Lambda/Production
 const isLambda = !!process.env.AWS_LAMBDA_FUNCTION_NAME;
 const isProduction = process.env.NODE_ENV === 'production';

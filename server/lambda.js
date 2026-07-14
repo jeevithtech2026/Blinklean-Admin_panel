@@ -44,6 +44,14 @@ async function loadSecrets() {
       if (secrets.JWT_SECRET) {
         process.env.JWT_SECRET = secrets.JWT_SECRET;
       }
+
+      // Load DynamoDB credentials for cross-account table access
+      if (secrets.DYNAMODB_ACCESS_KEY_ID) {
+        process.env.DYNAMODB_ACCESS_KEY_ID = secrets.DYNAMODB_ACCESS_KEY_ID;
+      }
+      if (secrets.DYNAMODB_SECRET_ACCESS_KEY) {
+        process.env.DYNAMODB_SECRET_ACCESS_KEY = secrets.DYNAMODB_SECRET_ACCESS_KEY;
+      }
       
       console.log('[Lambda Init] Database and JWT credentials successfully injected into environment.');
     }
