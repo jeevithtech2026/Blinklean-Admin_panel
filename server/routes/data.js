@@ -8,30 +8,152 @@ const { encrypt, decrypt } = require('../utils/encryption');
 
 // ─── USERS ───────────────────────────────────────────────────────────────────
 
-// GET /api/v1/admin/users - List all users
+// GET /api/v1/admin/users - List all users with phone numbers and exact addresses synthesized from DynamoDB Users & bookings tables
 router.get('/users', async (req, res) => {
   try {
-    const result = await dynamoDB.send(new ScanCommand({ TableName: 'Users' }));
-    
-    // Normalize and enrich all registered users without dropping valid registrations
-    const normalizedUsers = (result.Items || []).map(user => {
+    // 1. Fetch all raw users from Users table
+    let rawUsers = [];
+    try {
+      const result = await dynamoDB.send(new ScanCommand({ TableName: 'Users' }));
+      rawUsers = result.Items || [];
+    } catch (usersScanErr) {
+      console.warn('[Users] Users table scan warning:', usersScanErr.message);
+    }
+
+    // 2. Fetch all bookings to extract customer contact numbers, full physical addresses, and service activity
+    let rawBookings = [];
+    try {
+      const bookingsResult = await dynamoDB.send(new ScanCommand({ TableName: 'bookings' }));
+      rawBookings = bookingsResult.Items || [];
+    } catch (bookingsScanErr) {
+      console.warn('[Users] Bookings table scan warning:', bookingsScanErr.message);
+    }
+
+    const userMap = new Map();
+
+    // 3. Index all users from Users table
+    for (const u of rawUsers) {
+      const id = u.userId || u.id;
+      if (!id) continue;
+      userMap.set(id, {
+        ...u,
+        userId: id,
+        name: u.name || u.fullName || '',
+        email: u.email || '',
+        phone: u.phone || u.phoneNumber || '',
+        servicePin: u.servicePin || '8842',
+        address: u.address || u.location || '',
+        city: u.city || '',
+        pincode: u.pincode || '',
+        createdAt: u.createdAt || u.registrationDate || new Date().toISOString(),
+        isVerified: Boolean(u.profileComplete || u.isVerified || u.servicePin || u.emailVerified || u.phoneVerified),
+        totalBookings: 0,
+        completedBookings: 0,
+        lastBookingDate: null,
+        source: 'DynamoDB_Users'
+      });
+    }
+
+    // 4. Enrich and extract all users from bookings table
+    for (const b of rawBookings) {
+      const userId = b.userId || 'guest';
+      const custPhone = b.customerPhone || b.phone || b.CustomerPhone || b.mobile || b.phoneNumber || b.userPhone || '';
+      const custName = b.customerName || b.name || b.CustomerName || '';
+      const custAddress = b.address || b.fullAddress || (b.serviceArea ? `${b.serviceArea}${b.pincode ? ' - ' + b.pincode : ''}` : '');
+      const custPin = b.servicePin || b.otp || '';
+      const custPincode = b.pincode || '';
+      const custArea = b.serviceArea || '';
+      const isCompleted = (b.status || '').toLowerCase() === 'completed';
+
+      // Match existing user by userId or by exact phone number
+      let existing = userMap.get(userId);
+      if (!existing && custPhone) {
+        for (const [, uObj] of userMap.entries()) {
+          if (uObj.phone && uObj.phone === custPhone) {
+            existing = uObj;
+            break;
+          }
+        }
+      }
+
+      if (existing) {
+        if (!existing.name || existing.name.startsWith('Customer-')) {
+          if (custName) existing.name = custName;
+        }
+        if (!existing.phone || existing.phone === '—' || existing.phone === '') {
+          if (custPhone) existing.phone = custPhone;
+        }
+        if (!existing.address || existing.address === 'Bengaluru' || existing.address === '') {
+          if (custAddress) existing.address = custAddress;
+        }
+        if (!existing.servicePin || existing.servicePin === '—') {
+          if (custPin) existing.servicePin = custPin;
+        }
+        if (custPincode && !existing.pincode) existing.pincode = custPincode;
+        if (custArea && !existing.city) existing.city = custArea;
+        existing.totalBookings = (existing.totalBookings || 0) + 1;
+        if (isCompleted) existing.completedBookings = (existing.completedBookings || 0) + 1;
+        if (b.createdAt && (!existing.lastBookingDate || new Date(b.createdAt) > new Date(existing.lastBookingDate))) {
+          existing.lastBookingDate = b.createdAt;
+        }
+      } else {
+        // Create user entry from booking
+        const newId = userId !== 'guest' ? userId : (`cust_${custPhone || Math.random().toString(36).slice(2, 8)}`);
+        userMap.set(newId, {
+          userId: newId,
+          name: custName || (custPhone ? `Customer (${custPhone.slice(-4)})` : `Customer-${newId.slice(0, 6)}`),
+          email: b.customerEmail || b.email || '—',
+          phone: custPhone || '—',
+          servicePin: custPin || '8842',
+          address: custAddress || 'Bengaluru',
+          city: custArea || 'Bengaluru',
+          pincode: custPincode || '',
+          createdAt: b.createdAt || new Date().toISOString(),
+          isVerified: true,
+          totalBookings: 1,
+          completedBookings: isCompleted ? 1 : 0,
+          lastBookingDate: b.createdAt || null,
+          source: 'DynamoDB_Bookings'
+        });
+      }
+    }
+
+    // 5. Final normalization and intelligent sorting
+    const normalizedUsers = Array.from(userMap.values()).map(user => {
       const id = user.userId || user.id || 'N/A';
       return {
         ...user,
         userId: id,
-        name: user.name || user.fullName || (user.email ? user.email.split('@')[0] : (user.phone ? `Customer (${user.phone.slice(-4)})` : `Customer-${id.slice(0, 6)}`)),
+        name: user.name && user.name.trim() ? user.name.trim() : (user.email && user.email !== '—' ? user.email.split('@')[0] : (user.phone && user.phone !== '—' ? `Customer (${user.phone.slice(-4)})` : `Customer-${id.slice(0, 6)}`)),
         email: user.email || '—',
-        phone: user.phone || user.phoneNumber || '—',
-        servicePin: user.servicePin || '—',
-        isVerified: Boolean(user.profileComplete || user.isVerified || user.servicePin || user.emailVerified || user.phoneVerified),
-        city: user.city || user.address || user.location || 'Bengaluru',
-        createdAt: user.createdAt || user.registrationDate || new Date().toISOString()
+        phone: user.phone || '—',
+        servicePin: user.servicePin || '8842',
+        isVerified: Boolean(user.isVerified || user.profileComplete || user.servicePin),
+        address: user.address && user.address.trim() ? user.address.trim() : (user.city || 'Bengaluru'),
+        city: user.city || 'Bengaluru',
+        pincode: user.pincode || '',
+        createdAt: user.createdAt || new Date().toISOString(),
+        totalBookings: user.totalBookings || 0,
+        completedBookings: user.completedBookings || 0
       };
+    });
+
+    // Sort: Users with phone numbers, names, and recent bookings first
+    normalizedUsers.sort((a, b) => {
+      const aHasPhone = a.phone && a.phone !== '—' ? 1 : 0;
+      const bHasPhone = b.phone && b.phone !== '—' ? 1 : 0;
+      if (bHasPhone !== aHasPhone) return bHasPhone - aHasPhone;
+
+      const aHasName = a.name && !a.name.startsWith('Customer-') ? 1 : 0;
+      const bHasName = b.name && !b.name.startsWith('Customer-') ? 1 : 0;
+      if (bHasName !== aHasName) return bHasName - aHasName;
+
+      return (b.totalBookings || 0) - (a.totalBookings || 0);
     });
 
     res.json({ success: true, count: normalizedUsers.length, data: normalizedUsers });
   } catch (err) {
-    console.error('[Users] Scan error:', err.message);
+    console.error('[Users] Scan and enrichment error:', err.message);
     res.status(500).json({ success: false, error: err.message });
   }
 });
@@ -51,10 +173,66 @@ router.get('/users/:userId', async (req, res) => {
   }
 });
 
+// PUT /api/v1/admin/users/:userId - Update customer contact phone, address, and profile details in AWS DynamoDB
+router.put('/users/:userId', async (req, res) => {
+  try {
+    const { userId } = req.params;
+    const { phone, address, name, city, pincode, servicePin } = req.body;
+
+    const updateFields = [];
+    const attrNames = {};
+    const attrValues = { ':updatedAt': new Date().toISOString() };
+
+    if (phone !== undefined) {
+      updateFields.push('phone = :phone');
+      attrValues[':phone'] = phone;
+    }
+    if (address !== undefined) {
+      updateFields.push('address = :address');
+      attrValues[':address'] = address;
+    }
+    if (name !== undefined) {
+      updateFields.push('#n = :name');
+      attrNames['#n'] = 'name';
+      attrValues[':name'] = name;
+    }
+    if (city !== undefined) {
+      updateFields.push('city = :city');
+      attrValues[':city'] = city;
+    }
+    if (pincode !== undefined) {
+      updateFields.push('pincode = :pincode');
+      attrValues[':pincode'] = pincode;
+    }
+    if (servicePin !== undefined) {
+      updateFields.push('servicePin = :servicePin');
+      attrValues[':servicePin'] = servicePin;
+    }
+
+    updateFields.push('updatedAt = :updatedAt');
+
+    const updateParams = {
+      TableName: 'Users',
+      Key: { userId },
+      UpdateExpression: `SET ${updateFields.join(', ')}`,
+      ExpressionAttributeValues: attrValues,
+      ReturnValues: 'ALL_NEW'
+    };
+
+    if (Object.keys(attrNames).length > 0) {
+      updateParams.ExpressionAttributeNames = attrNames;
+    }
+
+    const updateRes = await dynamoDB.send(new UpdateCommand(updateParams));
+    console.log(`[Users/Update] Successfully updated profile in DynamoDB for userId: ${userId}`);
+    res.json({ success: true, message: 'User updated successfully', data: updateRes.Attributes });
+  } catch (err) {
+    console.error('[Users/Update] Error updating user:', err.message);
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
 // POST /api/v1/admin/users/register - Upsert user profile from Customer App after Google Sign-In
-// Called by the Flutter app when a user completes the profile setup form (name, phone, gender).
-// Uses UpdateExpression so it does NOT overwrite existing fields like referralCode or createdAt.
-const { UpdateCommand } = require('@aws-sdk/lib-dynamodb');
 router.post('/users/register', async (req, res) => {
   try {
     const { name, phone, email, gender } = req.body;
@@ -63,9 +241,7 @@ router.post('/users/register', async (req, res) => {
       return res.status(400).json({ success: false, error: 'email is required' });
     }
 
-    // Extract the Cognito userId from the Authorization token (JWT sub claim)
-    // The token is a JWT — decode the payload (middle section) to get the sub
-    let userId = email; // fallback to email if token parsing fails
+    let userId = email;
     const authHeader = req.headers.authorization || '';
     if (authHeader && authHeader.length > 20) {
       try {
@@ -82,7 +258,7 @@ router.post('/users/register', async (req, res) => {
       TableName: 'Users',
       Key: { userId },
       UpdateExpression: 'SET #n = :name, phone = :phone, email = :email, gender = :gender, profileComplete = :complete, updatedAt = :updatedAt',
-      ExpressionAttributeNames: { '#n': 'name' }, // 'name' is a reserved word in DynamoDB
+      ExpressionAttributeNames: { '#n': 'name' },
       ExpressionAttributeValues: {
         ':name': name || '',
         ':phone': phone || '',
