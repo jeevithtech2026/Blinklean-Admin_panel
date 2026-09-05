@@ -13,15 +13,23 @@ router.get('/users', async (req, res) => {
   try {
     const result = await dynamoDB.send(new ScanCommand({ TableName: 'Users' }));
     
-    // Filter out anonymous/incomplete user registrations (must have profileComplete, email, name, or phone)
-    const completedUsers = (result.Items || []).filter(user => 
-      user.profileComplete === true || 
-      (user.email && user.email.trim() !== '') || 
-      (user.name && user.name.trim() !== '') || 
-      (user.phone && user.phone.trim() !== '')
-    );
+    // Normalize and enrich all registered users without dropping valid registrations
+    const normalizedUsers = (result.Items || []).map(user => {
+      const id = user.userId || user.id || 'N/A';
+      return {
+        ...user,
+        userId: id,
+        name: user.name || user.fullName || (user.email ? user.email.split('@')[0] : (user.phone ? `Customer (${user.phone.slice(-4)})` : `Customer-${id.slice(0, 6)}`)),
+        email: user.email || '—',
+        phone: user.phone || user.phoneNumber || '—',
+        servicePin: user.servicePin || '—',
+        isVerified: Boolean(user.profileComplete || user.isVerified || user.servicePin || user.emailVerified || user.phoneVerified),
+        city: user.city || user.address || user.location || 'Bengaluru',
+        createdAt: user.createdAt || user.registrationDate || new Date().toISOString()
+      };
+    });
 
-    res.json({ success: true, count: completedUsers.length, data: completedUsers });
+    res.json({ success: true, count: normalizedUsers.length, data: normalizedUsers });
   } catch (err) {
     console.error('[Users] Scan error:', err.message);
     res.status(500).json({ success: false, error: err.message });
@@ -255,13 +263,26 @@ router.get('/bookings', async (req, res) => {
   try {
     const result = await dynamoDB.send(new ScanCommand({ TableName: 'bookings' }));
     
-    // Filter out skeleton/empty booking records (must have customerName and status)
-    const realBookings = (result.Items || []).filter(b => 
-      b.customerName && b.customerName.trim() !== '' &&
-      b.status && b.status.trim() !== ''
-    );
+    // Normalize all booking items so no records are improperly dropped
+    const normalizedBookings = (result.Items || []).map((b, idx) => {
+      const id = b.bookingId || b.id || `BK-${String(idx + 1).padStart(4, '0')}`;
+      return {
+        ...b,
+        bookingId: id,
+        customerName: b.customerName || b.customer || b.userName || b.name || 'Registered Customer',
+        customerPhone: b.customerPhone || b.phone || b.phoneNumber || '—',
+        serviceName: b.serviceName || b.service || b.title || 'General Cleaning',
+        subService: b.subService || b.description || '',
+        amount: Number(b.amount || b.price || b.totalAmount || 0),
+        status: (b.status || 'pending').toLowerCase(),
+        date: b.date || b.bookingDate || (b.createdAt ? new Date(b.createdAt).toISOString().split('T')[0] : 'Today'),
+        time: b.time || b.slot || '10:00 AM',
+        paymentMethod: b.paymentMethod || b.paymentMode || 'Online / Card',
+        createdAt: b.createdAt || new Date().toISOString()
+      };
+    });
 
-    res.json({ success: true, count: realBookings.length, data: realBookings });
+    res.json({ success: true, count: normalizedBookings.length, data: normalizedBookings });
   } catch (err) {
     console.error('[Bookings] Scan error:', err.message);
     res.status(500).json({ success: false, error: err.message });

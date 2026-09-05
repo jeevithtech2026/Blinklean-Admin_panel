@@ -50,6 +50,7 @@ function App() {
                   {/* Nested Dashboard Sub-pages */}
                   <Route index element={<Dashboard />} />
                   <Route path="customers" element={<Customers />} />
+                  <Route path="users" element={<Customers />} />
                   <Route path="partners" element={<Partners />} />
                   <Route path="bookings" element={<Bookings />} />
                   <Route path="financials" element={<Financials />} />

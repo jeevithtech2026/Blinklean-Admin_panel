@@ -2,7 +2,7 @@ import React from 'react';
 import { ArrowUpRight, ArrowDownRight } from 'lucide-react';
 import { useTheme } from '../../context/ThemeContext';
 
-const KpiCard = ({ title, value, trend, isPositive, icon: Icon, loading }) => {
+const KpiCard = ({ title, value, trend, isPositive, icon: Icon, loading, onClick, actionLabel }) => {
   const { density } = useTheme();
   
   const isCompact = density === 'compact';
@@ -29,9 +29,14 @@ const KpiCard = ({ title, value, trend, isPositive, icon: Icon, loading }) => {
   }
 
   return (
-    <div className={`rounded-2xl border border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-900 ${paddingClass} shadow-sm transition-all duration-300 hover:scale-[1.02] hover:shadow-md`}>
+    <div 
+      onClick={onClick}
+      className={`rounded-2xl border border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-900 ${paddingClass} shadow-sm transition-all duration-300 hover:scale-[1.02] hover:shadow-md ${onClick ? 'cursor-pointer hover:border-violet-300 dark:hover:border-violet-700/60 group' : ''}`}
+    >
       <div className="flex items-center justify-between">
-        <span className={`font-medium text-slate-500 dark:text-slate-400 ${titleSizeClass}`}>{title}</span>
+        <span className={`font-medium text-slate-500 dark:text-slate-400 ${titleSizeClass} ${onClick ? 'group-hover:text-violet-600 dark:group-hover:text-violet-400 transition-colors' : ''}`}>
+          {title}
+        </span>
         {Icon && (
           <span className={`rounded-xl border ${iconPaddingClass} ${
             isPositive 
@@ -44,7 +49,7 @@ const KpiCard = ({ title, value, trend, isPositive, icon: Icon, loading }) => {
       </div>
       <div className={`${marginClass} flex items-baseline justify-between`}>
         <span className={`font-bold text-slate-900 dark:text-white ${valueSizeClass}`}>{value}</span>
-        {trend && (
+        {trend ? (
           <span className={`inline-flex items-center gap-0.5 rounded-lg px-2 py-0.5 text-xs font-semibold ${
             isPositive 
               ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950/20 dark:text-emerald-450' 
@@ -53,7 +58,11 @@ const KpiCard = ({ title, value, trend, isPositive, icon: Icon, loading }) => {
             {isPositive ? <ArrowUpRight className="h-3.5 w-3.5 shrink-0" /> : <ArrowDownRight className="h-3.5 w-3.5 shrink-0" />}
             {trend}
           </span>
-        )}
+        ) : actionLabel ? (
+          <span className="text-[10px] font-bold text-violet-600 dark:text-violet-400 group-hover:underline">
+            {actionLabel} &rarr;
+          </span>
+        ) : null}
       </div>
     </div>
   );

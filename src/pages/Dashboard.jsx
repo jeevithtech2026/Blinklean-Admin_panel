@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { 
   Users, UserCheck, Calendar, CheckCircle2, BarChart3, WifiOff, AlertTriangle, MapPin,
-  ShieldCheck, Settings, Wallet, ListPlus, MessageSquare, Truck, FileText, Database, Gauge, Archive, Lock, Bug, Key
+  ShieldCheck, Settings, Wallet, ListPlus, MessageSquare, Truck, FileText, Database, Gauge, Archive, Lock, Bug, Key, ArrowRight
 } from 'lucide-react';
 import KpiCard from '../components/ui/KpiCard';
 import RefreshController from '../components/ui/RefreshController';
@@ -29,6 +30,7 @@ import SecurityAudit from './SecurityAudit';
 import WebhookSettings from './WebhookSettings';
 
 const Dashboard = () => {
+  const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
   const [isOffline, setIsOffline] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
@@ -37,14 +39,14 @@ const Dashboard = () => {
   const [activeMoreTab, setActiveMoreTab] = useState('payouts');
   
   const [metrics, setMetrics] = useState({
-    customers: { title: 'Total Registered Customers', value: '0', trend: '', isPositive: true, icon: Users },
+    customers: { title: 'Total Registered Users', value: '0', trend: '', isPositive: true, icon: Users },
     partners: { title: 'Total Registered Partners', value: '0', trend: '', isPositive: true, icon: UserCheck },
     bookings: { title: 'Active Bookings Today', value: '0', trend: '', isPositive: false, icon: Calendar },
     completions: { title: 'Completed Services Today', value: '0', trend: '', isPositive: true, icon: CheckCircle2 },
   });
 
   const fallbackMetrics = {
-    customers: { title: 'Total Registered Customers', value: '12,480', trend: '+12.5%', isPositive: true, icon: Users },
+    customers: { title: 'Total Registered Users', value: '12,480', trend: '+12.5%', isPositive: true, icon: Users },
     partners: { title: 'Total Registered Partners', value: '348', trend: '+4.2%', isPositive: true, icon: UserCheck },
     bookings: { title: 'Active Bookings Today', value: '95', trend: '-1.8%', isPositive: false, icon: Calendar },
     completions: { title: 'Completed Services Today', value: '1,248', trend: '+8.6%', isPositive: true, icon: CheckCircle2 },
@@ -62,7 +64,7 @@ const Dashboard = () => {
         const apiData = response.data;
         console.log('[Dashboard] Successfully retrieved dashboard summary:', apiData);
         setMetrics({
-          customers: { title: 'Total Registered Customers', value: apiData.customers || '0', trend: apiData.customersTrend || '', isPositive: apiData.customersIsPositive !== false, icon: Users },
+          customers: { title: 'Total Registered Users', value: apiData.customers || '0', trend: apiData.customersTrend || '', isPositive: apiData.customersIsPositive !== false, icon: Users },
           partners: { title: 'Total Registered Partners', value: apiData.partners || '0', trend: apiData.partnersTrend || '', isPositive: apiData.partnersIsPositive !== false, icon: UserCheck },
           bookings: { title: 'Active Bookings Today', value: apiData.bookings || '0', trend: apiData.bookingsTrend || '', isPositive: apiData.bookingsIsPositive !== false, icon: Calendar },
           completions: { title: 'Completed Services Today', value: apiData.completions || '0', trend: apiData.completionsTrend || '', isPositive: apiData.completionsIsPositive !== false, icon: CheckCircle2 },
@@ -114,21 +116,45 @@ const Dashboard = () => {
     { id: 'webhooks', name: 'Webhooks & APIs', icon: Key, component: WebhookSettings },
   ];
 
+  const quickNavCards = [
+    {
+      title: 'Users & Customers',
+      description: 'Directory of registered users, service PINs, and verified accounts',
+      icon: Users,
+      color: 'from-blue-600 to-indigo-600',
+      action: () => setActiveTab('customers')
+    },
+    {
+      title: 'Partner Management',
+      description: 'Manage partner onboarding, KYC reviews, categories, and verification',
+      icon: UserCheck,
+      color: 'from-violet-600 to-purple-600',
+      action: () => setActiveTab('partners')
+    },
+    {
+      title: 'Service Bookings',
+      description: 'Track live orders, house cleaning, vehicle washes, and fulfillment',
+      icon: Calendar,
+      color: 'from-emerald-600 to-teal-600',
+      action: () => setActiveTab('bookings')
+    }
+  ];
+
   return (
     <div className="space-y-6">
       {/* Header section */}
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight text-slate-900 dark:text-white">Overview Dashboard</h1>
-          <p className="text-sm text-slate-500 dark:text-slate-400">Coordinate and monitor system-wide operations stats and service trends.</p>
+          <h1 className="text-2xl font-bold tracking-tight text-slate-900 dark:text-white">Operations Command Center</h1>
+          <p className="text-sm text-slate-500 dark:text-slate-400">Coordinate and monitor system-wide users, partners, bookings, and logistical service trends.</p>
         </div>
 
         <div className="flex items-center gap-3">
           {/* Offline Fallback Badge Indicator */}
           {isOffline && (
-            <div className="flex items-center gap-1.5 rounded-xl bg-amber-50 px-3.5 py-2 text-xs font-bold text-amber-700 border border-amber-100/50 shadow-xs">
+            <div className="flex items-center gap-1.5 rounded-xl bg-amber-50 dark:bg-amber-950/30 px-3.5 py-2 text-xs font-bold text-amber-700 dark:text-amber-500 border border-amber-100/50 dark:border-amber-900/40 shadow-xs">
               <WifiOff className="h-4 w-4 shrink-0" />
-              <span>Mock Database Offline Active</span>
+              <span>Offline Database Active</span>
             </div>
           )}
           {activeTab === 'overview' && (
@@ -173,7 +199,7 @@ const Dashboard = () => {
               : 'text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-300'
           }`}
         >
-          <Users className="h-4 w-4" /> Customer Directory
+          <Users className="h-4 w-4" /> Users Directory
         </button>
         <button
           onClick={() => setActiveTab('partners')}
@@ -186,16 +212,6 @@ const Dashboard = () => {
           <UserCheck className="h-4 w-4" /> Partner Management
         </button>
         <button
-          onClick={() => setActiveTab('tracking')}
-          className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold transition-all cursor-pointer ${
-            activeTab === 'tracking'
-              ? 'bg-white dark:bg-slate-900 text-slate-900 dark:text-white shadow-xs border border-slate-200 dark:border-slate-700'
-              : 'text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-300'
-          }`}
-        >
-          <MapPin className="h-4 w-4" /> Partner Schedules
-        </button>
-        <button
           onClick={() => setActiveTab('bookings')}
           className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold transition-all cursor-pointer ${
             activeTab === 'bookings'
@@ -204,6 +220,16 @@ const Dashboard = () => {
           }`}
         >
           <Calendar className="h-4 w-4" /> Service Bookings
+        </button>
+        <button
+          onClick={() => setActiveTab('tracking')}
+          className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold transition-all cursor-pointer ${
+            activeTab === 'tracking'
+              ? 'bg-white dark:bg-slate-900 text-slate-900 dark:text-white shadow-xs border border-slate-200 dark:border-slate-700'
+              : 'text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-300'
+          }`}
+        >
+          <MapPin className="h-4 w-4" /> Partner Schedules
         </button>
         <button
           onClick={() => setActiveTab('verification-codes')}
@@ -231,7 +257,7 @@ const Dashboard = () => {
       <div className="mt-6">
         {activeTab === 'overview' && (
           <div className="space-y-6">
-            {/* KPI Cards Grid */}
+            {/* KPI Cards Grid with Click-to-Navigate */}
             <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
               <KpiCard
                 title={metrics.customers.title}
@@ -240,6 +266,8 @@ const Dashboard = () => {
                 isPositive={metrics.customers.isPositive}
                 icon={metrics.customers.icon}
                 loading={loading}
+                onClick={() => setActiveTab('customers')}
+                actionLabel="View Users"
               />
               <KpiCard
                 title={metrics.partners.title}
@@ -248,6 +276,8 @@ const Dashboard = () => {
                 isPositive={metrics.partners.isPositive}
                 icon={metrics.partners.icon}
                 loading={loading}
+                onClick={() => setActiveTab('partners')}
+                actionLabel="View Partners"
               />
               <KpiCard
                 title={metrics.bookings.title}
@@ -256,6 +286,8 @@ const Dashboard = () => {
                 isPositive={metrics.bookings.isPositive}
                 icon={metrics.bookings.icon}
                 loading={loading}
+                onClick={() => setActiveTab('bookings')}
+                actionLabel="View Bookings"
               />
               <KpiCard
                 title={metrics.completions.title}
@@ -264,7 +296,42 @@ const Dashboard = () => {
                 isPositive={metrics.completions.isPositive}
                 icon={metrics.completions.icon}
                 loading={loading}
+                onClick={() => setActiveTab('bookings')}
+                actionLabel="Review"
               />
+            </div>
+
+            {/* Quick Access Navigation Banners */}
+            <div className="grid gap-4 md:grid-cols-3">
+              {quickNavCards.map((card) => {
+                const Icon = card.icon;
+                return (
+                  <div
+                    key={card.title}
+                    onClick={card.action}
+                    className="relative overflow-hidden rounded-2xl bg-white dark:bg-slate-900 border border-slate-200/70 dark:border-slate-800 p-5 shadow-sm hover:shadow-md transition-all cursor-pointer group hover:border-violet-300 dark:hover:border-violet-700/60 flex flex-col justify-between"
+                  >
+                    <div>
+                      <div className="flex items-center justify-between mb-3">
+                        <span className={`flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br ${card.color} text-white shadow-sm`}>
+                          <Icon className="h-5 w-5" />
+                        </span>
+                        <ArrowRight className="h-4 w-4 text-slate-400 group-hover:text-violet-600 dark:group-hover:text-violet-400 group-hover:translate-x-1 transition-all" />
+                      </div>
+                      <h3 className="font-bold text-slate-900 dark:text-white text-base group-hover:text-violet-600 dark:group-hover:text-violet-400 transition-colors">
+                        {card.title}
+                      </h3>
+                      <p className="text-xs text-slate-500 dark:text-slate-400 mt-1 leading-relaxed">
+                        {card.description}
+                      </p>
+                    </div>
+                    <div className="mt-4 pt-3 border-t border-slate-100 dark:border-slate-800/80 flex items-center justify-between text-xs font-bold text-violet-600 dark:text-violet-400">
+                      <span>Open Management</span>
+                      <span>&rarr;</span>
+                    </div>
+                  </div>
+                );
+              })}
             </div>
 
             {/* Bottom Content Grid */}

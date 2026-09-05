@@ -121,9 +121,19 @@ const CustomersTable = ({ customers }) => {
                           </div>
                         )}
                         <div>
-                          <div className="font-bold text-slate-900 dark:text-white leading-tight">{customer.name || 'Anonymous User'}</div>
-                          <div className="flex items-center gap-1.5 mt-0.5">
+                          <div className="flex items-center gap-2">
+                            <span className="font-bold text-slate-900 dark:text-white leading-tight">{customer.name || 'Anonymous User'}</span>
+                            {customer.isVerified && (
+                              <span className="inline-flex items-center rounded-md bg-emerald-50 dark:bg-emerald-950/30 px-1.5 py-0.5 text-[9px] font-bold text-emerald-700 dark:text-emerald-400 border border-emerald-100 dark:border-emerald-900/30">Verified</span>
+                            )}
+                          </div>
+                          <div className="flex items-center gap-2 mt-1">
                             <span className="text-[10px] font-mono font-semibold text-slate-500">ID: {customer.userId || customer.id || 'N/A'}</span>
+                            {customer.servicePin && customer.servicePin !== '—' && (
+                              <span className="text-[9px] font-mono font-bold bg-violet-50 dark:bg-violet-950/40 text-violet-700 dark:text-violet-300 px-1.5 py-0.5 rounded border border-violet-100 dark:border-violet-900/30">
+                                PIN: {customer.servicePin}
+                              </span>
+                            )}
                           </div>
                         </div>
                       </div>
