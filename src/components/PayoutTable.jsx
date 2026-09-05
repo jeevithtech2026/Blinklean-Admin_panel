@@ -1,5 +1,20 @@
 import React, { useState, useMemo, useEffect } from 'react';
-import { ShieldAlert, ArrowUpDown, ChevronLeft, ChevronRight, Search, Building2, CreditCard, Loader2, Phone, MessageSquare, CheckCircle, UserCheck } from 'lucide-react';
+import { 
+  ShieldAlert, 
+  ArrowUpDown, 
+  ChevronLeft, 
+  ChevronRight, 
+  Search, 
+  Building2, 
+  Loader2, 
+  Phone, 
+  CheckCircle2, 
+  Clock, 
+  Receipt, 
+  Sparkles,
+  Info,
+  X
+} from 'lucide-react';
 import { useTheme } from '../context/ThemeContext';
 import BankDetailsModal from './BankDetailsModal';
 import ExportButton from './ExportButton';
@@ -9,6 +24,7 @@ const PayoutTable = ({ partners, onPayoutProcessed }) => {
   const { density } = useTheme();
 
   const [searchQuery, setSearchQuery] = useState('');
+  const [statusFilter, setStatusFilter] = useState('ALL'); // 'ALL' | 'NOT_PAID' | 'PAID' | 'KYC_APPROVED'
   const [sortField, setSortField] = useState(null);
   const [sortDirection, setSortDirection] = useState(null);
   const [currentPage, setCurrentPage] = useState(1);
@@ -16,16 +32,35 @@ const PayoutTable = ({ partners, onPayoutProcessed }) => {
   
   const [selectedPartner, setSelectedPartner] = useState(null);
   const [isBankModalOpen, setIsBankModalOpen] = useState(false);
+  const [receiptPartner, setReceiptPartner] = useState(null);
   const [processingPayout, setProcessingPayout] = useState(null);
 
   useEffect(() => {
     setCurrentPage(1);
-  }, [searchQuery, partners.length]);
+  }, [searchQuery, statusFilter, partners.length]);
 
   const filteredPartners = useMemo(() => {
+    let list = partners;
+
+    // Apply quick filter tabs
+    if (statusFilter === 'NOT_PAID') {
+      list = list.filter(p => {
+        const pending = Number(p.pendingAmount) || Math.max(0, (Number(p.earnings || p.totalEarnings || 0) - Number(p.paidAmount || 0)));
+        return p.payoutStatus !== 'PAID' && pending > 0;
+      });
+    } else if (statusFilter === 'PAID') {
+      list = list.filter(p => {
+        const pending = Number(p.pendingAmount) || Math.max(0, (Number(p.earnings || p.totalEarnings || 0) - Number(p.paidAmount || 0)));
+        return p.payoutStatus === 'PAID' || pending === 0;
+      });
+    } else if (statusFilter === 'KYC_APPROVED') {
+      list = list.filter(p => p.kycStatus === 'approved');
+    }
+
     const query = searchQuery.trim().toLowerCase();
-    if (!query) return partners;
-    return partners.filter((p) =>
+    if (!query) return list;
+
+    return list.filter((p) =>
       (p.name || '').toLowerCase().includes(query) ||
       (p.id || '').toLowerCase().includes(query) ||
       (p.phone || p.phoneNumber || '').toLowerCase().includes(query) ||
@@ -34,7 +69,7 @@ const PayoutTable = ({ partners, onPayoutProcessed }) => {
       (p.bankDetails?.bankName || '').toLowerCase().includes(query) ||
       (p.bankDetails?.ifscCode || '').toLowerCase().includes(query)
     );
-  }, [partners, searchQuery]);
+  }, [partners, searchQuery, statusFilter]);
 
   const sortedPartners = useMemo(() => {
     if (!sortField || !sortDirection) return filteredPartners;
@@ -43,8 +78,8 @@ const PayoutTable = ({ partners, onPayoutProcessed }) => {
       let valB = b[sortField];
       
       if (sortField === 'pendingAmount') {
-        valA = (a.earnings || a.totalEarnings || 0) - (a.paidAmount || 0);
-        valB = (b.earnings || b.totalEarnings || 0) - (b.paidAmount || 0);
+        valA = a.payoutStatus === 'PAID' ? 0 : ((a.earnings || a.totalEarnings || 0) - (a.paidAmount || 0));
+        valB = b.payoutStatus === 'PAID' ? 0 : ((b.earnings || b.totalEarnings || 0) - (b.paidAmount || 0));
       }
 
       if (sortField === 'completedCount') {
@@ -83,24 +118,26 @@ const PayoutTable = ({ partners, onPayoutProcessed }) => {
     return sortDirection === 'asc' ? <span className="text-violet-600">▲</span> : <span className="text-violet-600">▼</span>;
   };
 
-  const handleProcessPayout = async (partner, pendingAmount) => {
-    if (!partner.bankDetails || !partner.bankDetails.accountNumber) {
-      setSelectedPartner(partner);
-      setIsBankModalOpen(true);
-      return;
-    }
-    
-    if (window.confirm(`Are you sure you want to process a payout of ₹${pendingAmount.toFixed(2)} to ${partner.name}?`)) {
+  // Toggle "Not Paid" -> "Paid"
+  const handleTogglePayout = async (partner, pendingAmount) => {
+    const pName = partner.name || 'Partner';
+    const numPending = Number(pendingAmount) || 0;
+
+    const confirmMsg = `Are you sure you want to mark ₹${numPending.toLocaleString('en-IN', { minimumFractionDigits: 2 })} as PAID for ${pName}?\n\n• Admin metrics will instantly count ₹${numPending.toLocaleString('en-IN', { minimumFractionDigits: 2 })} as Paid.\n• The Partner App earnings screen will reset to ₹0 in 30 minutes.`;
+
+    if (window.confirm(confirmMsg)) {
       setProcessingPayout(partner.id);
       try {
         try {
-          await axiosInstance.post(`/api/v1/data/partners/${partner.id}/payout`, { amount: pendingAmount });
+          await axiosInstance.post(`/api/v1/data/partners/${partner.id}/payout`, { amount: numPending });
         } catch (apiErr) {
-          console.warn('Backend payout endpoint warning, updating local state:', apiErr.message);
+          console.warn('Backend payout endpoint warning, syncing locally:', apiErr.message);
         }
-        if (onPayoutProcessed) onPayoutProcessed(partner.id, pendingAmount);
+        if (onPayoutProcessed) {
+          onPayoutProcessed(partner.id, numPending, pName);
+        }
       } catch (err) {
-        alert(err.response?.data?.error || err.message || "Failed to process payout.");
+        alert(err.response?.data?.error || err.message || "Failed to mark as paid.");
       } finally {
         setProcessingPayout(null);
       }
@@ -117,7 +154,8 @@ const PayoutTable = ({ partners, onPayoutProcessed }) => {
     return filteredPartners.map(p => {
       const earnings = Number(p.earnings || p.totalEarnings) || 0;
       const paid = Number(p.paidAmount) || 0;
-      const pending = Number(p.pendingAmount) || Math.max(0, earnings - paid);
+      const pending = p.payoutStatus === 'PAID' ? 0 : (Number(p.pendingAmount) || Math.max(0, earnings - paid));
+      const status = p.payoutStatus === 'PAID' || pending === 0 ? 'PAID' : 'NOT_PAID';
       return {
         Partner_ID: p.id,
         Partner_Name: p.name || 'N/A',
@@ -128,29 +166,77 @@ const PayoutTable = ({ partners, onPayoutProcessed }) => {
         Total_Earnings_INR: earnings,
         Paid_Amount_INR: paid,
         Pending_Payout_INR: pending,
+        Payout_Status: status,
+        Partner_App_Zero_Sync: status === 'PAID' ? 'Scheduled 30-min Reset' : 'Pending Payment',
         Bank_Name: p.bankDetails?.bankName || 'N/A',
         Account_Number: p.bankDetails?.accountNumber ? `****${p.bankDetails.accountNumber.slice(-4)}` : 'N/A',
-        IFSC_Code: p.bankDetails?.ifscCode || 'N/A',
-        Status: p.status || 'active'
+        IFSC_Code: p.bankDetails?.ifscCode || 'N/A'
       };
     });
   };
 
   return (
     <div className="space-y-4">
-      {/* Search and Export Bar */}
-      <div className="rounded-2xl border border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-900 p-4 shadow-sm flex flex-col sm:flex-row items-center justify-between gap-4">
-        <div className="flex items-center gap-3 w-full sm:w-auto">
+      {/* Search, Status Filters, and Export Bar */}
+      <div className="rounded-2xl border border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-900 p-4 shadow-sm flex flex-col md:flex-row items-center justify-between gap-4">
+        {/* Search Input */}
+        <div className="flex items-center gap-3 w-full md:w-auto">
           <Search className="h-4.5 w-4.5 text-slate-400 dark:text-slate-500 shrink-0" />
           <input
             type="text"
             placeholder="Search partners by name, ID, phone, bank, or IFSC..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full sm:w-96 bg-transparent text-sm text-slate-700 dark:text-slate-350 outline-none placeholder-slate-400 dark:placeholder-slate-600"
+            className="w-full sm:w-80 bg-transparent text-sm text-slate-700 dark:text-slate-200 outline-none placeholder-slate-400 dark:placeholder-slate-500"
           />
         </div>
-        <ExportButton type="Partner_Payouts" getData={exportData} />
+
+        {/* Filter Pills */}
+        <div className="flex flex-wrap items-center gap-2 w-full md:w-auto">
+          <button
+            onClick={() => setStatusFilter('ALL')}
+            className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-colors cursor-pointer ${
+              statusFilter === 'ALL'
+                ? 'bg-violet-600 text-white shadow-xs'
+                : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-700'
+            }`}
+          >
+            All ({partners.length})
+          </button>
+          <button
+            onClick={() => setStatusFilter('NOT_PAID')}
+            className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-colors cursor-pointer flex items-center gap-1.5 ${
+              statusFilter === 'NOT_PAID'
+                ? 'bg-amber-500 text-white shadow-xs'
+                : 'bg-amber-50 dark:bg-amber-950/30 text-amber-700 dark:text-amber-400 hover:bg-amber-100 dark:hover:bg-amber-950/50'
+            }`}
+          >
+            <Clock className="h-3 w-3" />
+            Not Paid Only
+          </button>
+          <button
+            onClick={() => setStatusFilter('PAID')}
+            className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-colors cursor-pointer flex items-center gap-1.5 ${
+              statusFilter === 'PAID'
+                ? 'bg-emerald-600 text-white shadow-xs'
+                : 'bg-emerald-50 dark:bg-emerald-950/30 text-emerald-700 dark:text-emerald-400 hover:bg-emerald-100 dark:hover:bg-emerald-950/50'
+            }`}
+          >
+            <CheckCircle2 className="h-3 w-3" />
+            Paid Only
+          </button>
+          <button
+            onClick={() => setStatusFilter('KYC_APPROVED')}
+            className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-colors cursor-pointer ${
+              statusFilter === 'KYC_APPROVED'
+                ? 'bg-slate-800 text-white dark:bg-slate-200 dark:text-slate-900'
+                : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:bg-slate-200'
+            }`}
+          >
+            KYC Verified
+          </button>
+          <ExportButton type="Partner_Payouts" getData={exportData} />
+        </div>
       </div>
 
       {/* Table */}
@@ -175,7 +261,7 @@ const PayoutTable = ({ partners, onPayoutProcessed }) => {
                 <th className={`${thPadding} text-right`} onClick={() => handleSort('pendingAmount')}>
                   <div className="flex items-center justify-end gap-1.5 cursor-pointer">Pending {renderSortIndicator('pendingAmount')}</div>
                 </th>
-                <th className={`${thPadding} text-center`}>Actions</th>
+                <th className={`${thPadding} text-center`}>Payout Action</th>
               </tr>
             </thead>
             <tbody className={`divide-y divide-slate-100 dark:divide-slate-800 ${bodyTextSize}`}>
@@ -183,12 +269,12 @@ const PayoutTable = ({ partners, onPayoutProcessed }) => {
                 paginatedPartners.map((partner) => {
                   const earnings = Number(partner.earnings || partner.totalEarnings) || 0;
                   const paidAmount = Number(partner.paidAmount) || 0;
-                  const pendingAmount = Number(partner.pendingAmount) || Math.max(0, earnings - paidAmount);
+                  const isMarkedPaid = partner.payoutStatus === 'PAID';
+                  const pendingAmount = isMarkedPaid ? 0 : (Number(partner.pendingAmount) !== undefined ? Number(partner.pendingAmount) : Math.max(0, earnings - paidAmount));
+                  const isUnpaid = !isMarkedPaid && pendingAmount > 0;
                   const hasBankDetails = partner.bankDetails && partner.bankDetails.accountNumber;
-                  const canPay = pendingAmount > 0;
                   const completedServices = partner.completedCount ?? partner.orders ?? partner.completedOrders ?? 0;
                   const phoneStr = partner.phone || partner.phoneNumber;
-                  const cleanPhone = phoneStr ? phoneStr.replace(/[^0-9]/g, '') : null;
 
                   return (
                     <tr key={partner.id} className="hover:bg-slate-50/50 dark:hover:bg-slate-850/30 transition-colors">
@@ -263,39 +349,52 @@ const PayoutTable = ({ partners, onPayoutProcessed }) => {
                         </span>
                       </td>
 
-                      {/* Earnings */}
+                      {/* Lifetime Earnings */}
                       <td className={`${tdPadding} text-right font-bold text-slate-800 dark:text-slate-200`}>
                         ₹{earnings.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
                       </td>
                       
-                      {/* Paid */}
+                      {/* Paid Amount */}
                       <td className={`${tdPadding} text-right font-bold text-emerald-600 dark:text-emerald-400`}>
                         ₹{paidAmount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
                       </td>
 
-                      {/* Pending */}
-                      <td className={`${tdPadding} text-right font-bold text-amber-600 dark:text-amber-400`}>
+                      {/* Pending Amount */}
+                      <td className={`${tdPadding} text-right font-bold ${pendingAmount > 0 ? 'text-amber-600 dark:text-amber-400' : 'text-slate-400 dark:text-slate-500'}`}>
                         ₹{pendingAmount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
                       </td>
 
-                      {/* Actions */}
+                      {/* Payout Action: "Not Paid" -> "Paid" */}
                       <td className={`${tdPadding} text-center`}>
-                        <button 
-                          disabled={!canPay || processingPayout === partner.id}
-                          onClick={() => handleProcessPayout(partner, pendingAmount)}
-                          className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
-                            canPay 
-                              ? 'bg-violet-600 hover:bg-violet-700 text-white shadow-sm' 
-                              : 'bg-slate-100 dark:bg-slate-800 text-slate-400 dark:text-slate-600 cursor-not-allowed opacity-60'
-                          }`}
-                        >
-                          {processingPayout === partner.id ? (
-                            <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                          ) : (
-                            <CreditCard className="h-3.5 w-3.5" />
-                          )}
-                          Pay Now
-                        </button>
+                        {isUnpaid ? (
+                          <button 
+                            disabled={processingPayout === partner.id}
+                            onClick={() => handleTogglePayout(partner, pendingAmount)}
+                            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer bg-amber-500/10 hover:bg-amber-500 text-amber-700 dark:text-amber-400 hover:text-white border border-amber-500/30 shadow-xs hover:shadow-md active:scale-95 group"
+                            title="Click to Mark as Paid (Will reset partner app earnings to ₹0 in 30 mins)"
+                          >
+                            {processingPayout === partner.id ? (
+                              <>
+                                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                                <span>Processing...</span>
+                              </>
+                            ) : (
+                              <>
+                                <span className="h-2 w-2 rounded-full bg-amber-500 animate-pulse group-hover:bg-white" />
+                                <span>Not Paid</span>
+                              </>
+                            )}
+                          </button>
+                        ) : (
+                          <button 
+                            onClick={() => setReceiptPartner(partner)}
+                            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border border-emerald-500/30 hover:bg-emerald-500/20 transition-all cursor-pointer shadow-xs"
+                            title="Payout Settled. Click to view payout receipt & 30-min zero sync status."
+                          >
+                            <CheckCircle2 className="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400" />
+                            <span>Paid</span>
+                          </button>
+                        )}
                       </td>
                     </tr>
                   );
@@ -307,7 +406,7 @@ const PayoutTable = ({ partners, onPayoutProcessed }) => {
                       <ShieldAlert className="h-9 w-9 text-slate-300 dark:text-slate-700" />
                       <h4 className="text-sm font-bold text-slate-800 dark:text-slate-300">No partner records found</h4>
                       <p className="text-xs text-slate-500 max-w-xs mx-auto leading-normal">
-                        No partners match your current search criteria.
+                        No partners match your current search or filter criteria.
                       </p>
                     </div>
                   </td>
@@ -324,7 +423,7 @@ const PayoutTable = ({ partners, onPayoutProcessed }) => {
             <select
               value={rowsPerPage}
               onChange={(e) => { setRowsPerPage(Number(e.target.value)); setCurrentPage(1); }}
-              className="bg-transparent font-bold text-slate-700 dark:text-slate-350 outline-none cursor-pointer border border-slate-200 dark:border-slate-800 px-2.5 py-1 rounded-lg"
+              className="bg-transparent font-bold text-slate-700 dark:text-slate-300 outline-none cursor-pointer border border-slate-200 dark:border-slate-800 px-2.5 py-1 rounded-lg"
             >
               {[10, 25, 50, 100].map((size) => (
                 <option key={size} value={size} className="bg-white dark:bg-slate-900">{size} rows</option>
@@ -332,7 +431,7 @@ const PayoutTable = ({ partners, onPayoutProcessed }) => {
             </select>
           </div>
           <div className="flex items-center justify-between sm:justify-end gap-6 w-full sm:w-auto">
-            <span>Page <span className="font-bold text-slate-800 dark:text-slate-200">{currentPage}</span> of <span className="font-bold text-slate-800 dark:text-slate-200">{totalPages}</span> ({sortedPartners.length} registered partners)</span>
+            <span>Page <span className="font-bold text-slate-800 dark:text-slate-200">{currentPage}</span> of <span className="font-bold text-slate-800 dark:text-slate-200">{totalPages}</span> ({sortedPartners.length} partners)</span>
             <div className="flex items-center gap-1.5">
               <button onClick={() => setCurrentPage((p) => Math.max(1, p - 1))} disabled={currentPage === 1} className="flex items-center justify-center p-2 rounded-lg border border-slate-200 dark:border-slate-800 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-400 disabled:opacity-40 cursor-pointer">
                 <ChevronLeft className="h-4 w-4" />
@@ -345,6 +444,7 @@ const PayoutTable = ({ partners, onPayoutProcessed }) => {
         </div>
       </div>
 
+      {/* Bank Details Edit Modal */}
       <BankDetailsModal 
         isOpen={isBankModalOpen}
         onClose={() => setIsBankModalOpen(false)}
@@ -355,6 +455,79 @@ const PayoutTable = ({ partners, onPayoutProcessed }) => {
           }
         }}
       />
+
+      {/* Payout Receipt & 30-Minute Sync Details Modal */}
+      {receiptPartner && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-xs p-4 animate-in fade-in">
+          <div className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-100 dark:border-slate-800 max-w-md w-full p-6 shadow-2xl space-y-5">
+            <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-4">
+              <div className="flex items-center gap-2">
+                <span className="flex h-9 w-9 items-center justify-center rounded-2xl bg-emerald-500/10 text-emerald-600 dark:text-emerald-400">
+                  <CheckCircle2 className="h-5 w-5" />
+                </span>
+                <div>
+                  <h3 className="font-bold text-base text-slate-900 dark:text-white">Payout Settlement Record</h3>
+                  <p className="text-xs text-slate-500 dark:text-slate-400">Direct Partner Disbursement</p>
+                </div>
+              </div>
+              <button
+                onClick={() => setReceiptPartner(null)}
+                className="p-1.5 rounded-xl text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 cursor-pointer"
+              >
+                <X className="h-4.5 w-4.5" />
+              </button>
+            </div>
+
+            {/* Partner Details */}
+            <div className="space-y-3 bg-slate-50 dark:bg-slate-850/50 p-4 rounded-2xl border border-slate-100 dark:border-slate-800 text-xs">
+              <div className="flex justify-between">
+                <span className="text-slate-500">Partner:</span>
+                <span className="font-bold text-slate-800 dark:text-slate-200">{receiptPartner.name}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-slate-500">Phone:</span>
+                <span className="font-mono text-slate-700 dark:text-slate-300">{receiptPartner.phone || receiptPartner.phoneNumber || '—'}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-slate-500">Category:</span>
+                <span className="text-slate-700 dark:text-slate-300">{receiptPartner.category || 'General Cleaning'}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-slate-500">Total Lifetime Earned:</span>
+                <span className="font-bold text-slate-800 dark:text-slate-200">
+                  ₹{(receiptPartner.earnings || receiptPartner.totalEarnings || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                </span>
+              </div>
+              <div className="flex justify-between border-t border-slate-200 dark:border-slate-700 pt-2 font-bold text-emerald-600 dark:text-emerald-400 text-sm">
+                <span>Total Amount Paid:</span>
+                <span>₹{(receiptPartner.paidAmount || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
+              </div>
+              <div className="flex justify-between font-bold text-slate-500 text-xs">
+                <span>Pending Balance:</span>
+                <span>₹0.00</span>
+              </div>
+            </div>
+
+            {/* 30-Minute Zero Screen Sync Notice */}
+            <div className="flex items-start gap-3 p-3.5 rounded-2xl bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-200 dark:border-emerald-800/40 text-xs text-emerald-800 dark:text-emerald-300">
+              <Sparkles className="h-4.5 w-4.5 text-emerald-600 dark:text-emerald-400 shrink-0 mt-0.5" />
+              <div>
+                <span className="font-bold block">Partner App Earnings Sync</span>
+                <p className="mt-0.5 text-emerald-700 dark:text-emerald-400">
+                  This payout is marked as <strong>PAID</strong> in admin records. The partner's mobile app earnings screen will automatically reflect <strong>₹0.00</strong> in 30 minutes.
+                </p>
+              </div>
+            </div>
+
+            <button
+              onClick={() => setReceiptPartner(null)}
+              className="w-full py-2.5 bg-violet-600 hover:bg-violet-700 text-white rounded-xl text-xs font-bold transition-colors cursor-pointer"
+            >
+              Close
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

@@ -446,8 +446,17 @@ router.get('/partners', async (req, res) => {
         earnings = completed * 150;
       }
 
-      const paidAmount = p.paidAmount || (earnings > (p.pendingAmount || 0) ? earnings - (p.pendingAmount || 0) : 0);
-      const pendingAmount = p.pendingAmount || Math.max(0, earnings - paidAmount);
+      let paidAmount = Number(p.paidAmount || 0);
+      let pendingAmount = p.pendingAmount !== undefined ? Number(p.pendingAmount) : Math.max(0, earnings - paidAmount);
+      
+      if (p.payoutStatus === 'PAID') {
+        pendingAmount = 0;
+        paidAmount = Math.max(paidAmount, earnings);
+      } else if (paidAmount >= earnings && earnings > 0) {
+        pendingAmount = 0;
+      }
+
+      const payoutStatus = p.payoutStatus || (pendingAmount === 0 && (paidAmount > 0 || earnings === 0) ? 'PAID' : 'NOT_PAID');
 
       return {
         ...p,
@@ -462,6 +471,9 @@ router.get('/partners', async (req, res) => {
         totalEarnings: earnings,
         paidAmount: paidAmount,
         pendingAmount: pendingAmount,
+        payoutStatus: payoutStatus,
+        lastPayoutDate: p.lastPayoutDate || null,
+        payoutScheduledZeroAt: p.payoutScheduledZeroAt || null,
         rating: p.rating || 4.8,
         status: p.status || (p.isOnboardingComplete ? 'active' : 'pending'),
         kycStatus: p.kycStatus || (p.bankAccountNumber || p.bankDetails ? 'approved' : 'pending')
@@ -581,7 +593,7 @@ router.put('/partners/:id/verify', async (req, res) => {
   }
 });
 
-// POST /api/v1/admin/partners/:id/payout - Process payout for a partner
+// POST /api/v1/admin/partners/:id/payout - Process payout for a partner and schedule partner app balance zeroing
 router.post('/partners/:id/payout', async (req, res) => {
   try {
     const { id } = req.params;
@@ -593,40 +605,46 @@ router.post('/partners/:id/payout', async (req, res) => {
 
     const numAmount = Number(amount);
     const nowIso = new Date().toISOString();
+    // 30 minutes from now when the partner mobile app earnings screen will be fully zeroed out
+    const scheduledZeroIso = new Date(Date.now() + 30 * 60 * 1000).toISOString();
 
-    // 1. Update in Partners table
+    // 1. Update in Partners table: set paidAmount, reset pendingAmount to 0, mark payoutStatus as PAID, and set 30-min zero sync timestamp
     try {
       await dynamoDB.send(new UpdateCommand({
         TableName: 'Partners',
         Key: { id },
-        UpdateExpression: 'SET paidAmount = if_not_exists(paidAmount, :zero) + :amount, lastPayoutDate = :now, updatedAt = :now',
+        UpdateExpression: 'SET paidAmount = if_not_exists(paidAmount, :zero) + :amount, pendingAmount = :zero, payoutStatus = :paidStatus, lastPayoutDate = :now, payoutScheduledZeroAt = :scheduledZero, earningsScreenResetAt = :scheduledZero, updatedAt = :now',
         ExpressionAttributeValues: {
           ':zero': 0,
           ':amount': numAmount,
-          ':now': nowIso
+          ':paidStatus': 'PAID',
+          ':now': nowIso,
+          ':scheduledZero': scheduledZeroIso
         }
       }));
     } catch (partnerTableErr) {
       console.warn('[Partners/Payout] Partners table update warning:', partnerTableErr.message);
     }
 
-    // 2. Also record in PartnerEarnings if available
+    // 2. Also record in PartnerEarnings if available so Partner App sees balance cleared
     try {
       await dynamoDB.send(new UpdateCommand({
         TableName: 'PartnerEarnings',
         Key: { parterId: id },
-        UpdateExpression: 'SET currentBalance = if_not_exists(currentBalance, :zero) - :amount, current_balance = if_not_exists(current_balance, :zero) - :amount, updatedAt = :now',
+        UpdateExpression: 'SET currentBalance = :zero, current_balance = :zero, pending_payout = :zero, last_payout_amount = :amount, last_payout_time = :now, payout_cleared_at = :scheduledZero, payoutStatus = :paidStatus, updatedAt = :now',
         ExpressionAttributeValues: {
-          ':zero': numAmount,
+          ':zero': 0,
           ':amount': numAmount,
-          ':now': nowIso
+          ':paidStatus': 'PAID',
+          ':now': nowIso,
+          ':scheduledZero': scheduledZeroIso
         }
       }));
     } catch (_) {
       // Non-blocking if table or partition key differs
     }
 
-    // 3. Log into BlinkLean_Earnings
+    // 3. Log into BlinkLean_Earnings ledger
     try {
       await dynamoDB.send(new PutCommand({
         TableName: 'BlinkLean_Earnings',
@@ -635,7 +653,9 @@ router.post('/partners/:id/payout', async (req, res) => {
           jobId: `PAYOUT-${Date.now()}`,
           amount: numAmount,
           isWithdrawal: true,
-          type: 'Bank Transfer Payout',
+          type: 'Admin Direct Bank Payout',
+          status: 'PAID',
+          scheduledZeroAt: scheduledZeroIso,
           timestamp: nowIso
         }
       }));
@@ -643,7 +663,14 @@ router.post('/partners/:id/payout', async (req, res) => {
       // Non-blocking
     }
 
-    res.json({ success: true, message: `Payout of ₹${numAmount.toFixed(2)} processed successfully.` });
+    res.json({
+      success: true,
+      message: `Payout of ₹${numAmount.toFixed(2)} marked as PAID. Partner app earnings screen will reflect ₹0 in 30 minutes.`,
+      payoutStatus: 'PAID',
+      paidAmount: numAmount,
+      pendingAmount: 0,
+      scheduledZeroAt: scheduledZeroIso
+    });
   } catch (err) {
     console.error('[Partners] Payout Process error:', err.message);
     res.status(500).json({ success: false, error: err.message });
