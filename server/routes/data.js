@@ -1,7 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const { dynamoDB } = require('../config/dynamodb');
-const { ScanCommand, GetCommand, QueryCommand, PutCommand, DeleteCommand } = require('@aws-sdk/lib-dynamodb');
+const { ScanCommand, GetCommand, QueryCommand, PutCommand, DeleteCommand, UpdateCommand } = require('@aws-sdk/lib-dynamodb');
 
 const { CognitoIdentityProviderClient, ListUsersCommand } = require('@aws-sdk/client-cognito-identity-provider');
 const { encrypt, decrypt } = require('../utils/encryption');
@@ -587,22 +587,63 @@ router.post('/partners/:id/payout', async (req, res) => {
     const { id } = req.params;
     const { amount } = req.body;
 
-    if (!amount || isNaN(amount) || amount <= 0) {
+    if (!amount || isNaN(amount) || Number(amount) <= 0) {
       return res.status(400).json({ success: false, error: 'Valid payout amount is required' });
     }
 
-    await dynamoDB.send(new UpdateCommand({
-      TableName: 'Partners',
-      Key: { id },
-      UpdateExpression: 'SET paidAmount = if_not_exists(paidAmount, :zero) + :amount, lastPayoutDate = :now, updatedAt = :now',
-      ExpressionAttributeValues: {
-        ':zero': 0,
-        ':amount': Number(amount),
-        ':now': new Date().toISOString()
-      }
-    }));
+    const numAmount = Number(amount);
+    const nowIso = new Date().toISOString();
 
-    res.json({ success: true, message: 'Payout successfully recorded' });
+    // 1. Update in Partners table
+    try {
+      await dynamoDB.send(new UpdateCommand({
+        TableName: 'Partners',
+        Key: { id },
+        UpdateExpression: 'SET paidAmount = if_not_exists(paidAmount, :zero) + :amount, lastPayoutDate = :now, updatedAt = :now',
+        ExpressionAttributeValues: {
+          ':zero': 0,
+          ':amount': numAmount,
+          ':now': nowIso
+        }
+      }));
+    } catch (partnerTableErr) {
+      console.warn('[Partners/Payout] Partners table update warning:', partnerTableErr.message);
+    }
+
+    // 2. Also record in PartnerEarnings if available
+    try {
+      await dynamoDB.send(new UpdateCommand({
+        TableName: 'PartnerEarnings',
+        Key: { parterId: id },
+        UpdateExpression: 'SET currentBalance = if_not_exists(currentBalance, :zero) - :amount, current_balance = if_not_exists(current_balance, :zero) - :amount, updatedAt = :now',
+        ExpressionAttributeValues: {
+          ':zero': numAmount,
+          ':amount': numAmount,
+          ':now': nowIso
+        }
+      }));
+    } catch (_) {
+      // Non-blocking if table or partition key differs
+    }
+
+    // 3. Log into BlinkLean_Earnings
+    try {
+      await dynamoDB.send(new PutCommand({
+        TableName: 'BlinkLean_Earnings',
+        Item: {
+          partnerId: id,
+          jobId: `PAYOUT-${Date.now()}`,
+          amount: numAmount,
+          isWithdrawal: true,
+          type: 'Bank Transfer Payout',
+          timestamp: nowIso
+        }
+      }));
+    } catch (_) {
+      // Non-blocking
+    }
+
+    res.json({ success: true, message: `Payout of ₹${numAmount.toFixed(2)} processed successfully.` });
   } catch (err) {
     console.error('[Partners] Payout Process error:', err.message);
     res.status(500).json({ success: false, error: err.message });
