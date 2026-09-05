@@ -4,7 +4,7 @@ import { useAuth } from '../context/AuthContext';
 import SystemHealthBanner from '../components/SystemHealthBanner';
 import SettingsPanel from '../components/SettingsPanel';
 import { 
-  LayoutDashboard, Users, UserCheck, Calendar, MapPin, MessageSquare, 
+  LayoutDashboard, Users, UserCheck, Calendar,
   Wallet, ShieldCheck, LogOut, Menu, X, Bell, User, Search, ChevronRight
 } from 'lucide-react';
 
@@ -25,15 +25,13 @@ const DashboardLayout = () => {
         { name: 'User Directory', path: '/dashboard/customers', icon: Users, badge: 'Users' },
         { name: 'Partner Management', path: '/dashboard/partners', icon: UserCheck, badge: 'Partners' },
         { name: 'Service Bookings', path: '/dashboard/bookings', icon: Calendar, badge: 'Bookings' },
-        { name: 'Partner Schedules & Areas', path: '/dashboard/tracking', icon: MapPin },
         { name: 'Verification Codes', path: '/dashboard/verification-codes', icon: ShieldCheck },
       ]
     },
     {
-      title: 'Finance & Reviews',
+      title: 'Finance & Accounts',
       items: [
         { name: 'Partner Payouts', path: '/dashboard/payouts', icon: Wallet },
-        { name: 'Customer Feedback', path: '/dashboard/feedbacks', icon: MessageSquare },
       ]
     }
   ];

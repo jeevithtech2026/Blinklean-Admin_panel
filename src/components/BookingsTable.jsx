@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useEffect } from 'react';
-import { ShieldAlert, ArrowUpDown, ChevronLeft, ChevronRight, Search, CheckCircle, Clock, XCircle, CreditCard, Calendar, UserCheck, AlertCircle } from 'lucide-react';
+import { ShieldAlert, ArrowUpDown, ChevronLeft, ChevronRight, Search, CheckCircle, Clock, XCircle, CreditCard, Calendar, UserCheck, AlertCircle, Recycle } from 'lucide-react';
 import { useTheme } from '../context/ThemeContext';
 
 const BookingsTable = ({ bookings }) => {
@@ -9,11 +9,28 @@ const BookingsTable = ({ bookings }) => {
   const [sortField, setSortField] = useState(null);
   const [sortDirection, setSortDirection] = useState(null);
   const [currentPage, setCurrentPage] = useState(1);
-  const [rowsPerPage, setRowsPerPage] = useState(10);
+  const [rowsPerPage, setRowsPerPage] = useState(50);
 
   useEffect(() => {
     setCurrentPage(1);
   }, [searchQuery, bookings.length]);
+
+  const formatDate = (booking) => {
+    const raw = booking.date || booking.serviceDate || booking.createdAt;
+    if (!raw) return '—';
+    if (raw.toLowerCase() === 'today') {
+      return new Date().toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
+    }
+    try {
+      const parsed = new Date(raw);
+      if (!isNaN(parsed.getTime())) {
+        return parsed.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
+      }
+    } catch {
+      // fallback to raw string
+    }
+    return raw;
+  };
 
   const getStatusBadge = (status) => {
     const s = (status || '').toLowerCase();
@@ -119,7 +136,7 @@ const BookingsTable = ({ bookings }) => {
                 <th className={thPadding} onClick={() => handleSort('status')}>
                   <div className="flex items-center gap-1.5 cursor-pointer">Status {renderSortIndicator('status')}</div>
                 </th>
-                <th className={thPadding}>Schedule</th>
+                <th className={thPadding}>Schedule Date</th>
               </tr>
             </thead>
             <tbody className={`divide-y divide-slate-100 dark:divide-slate-800 ${bodyTextSize}`}>
@@ -127,6 +144,7 @@ const BookingsTable = ({ bookings }) => {
                 paginatedBookings.map((booking) => {
                   const assignedPartner = booking.assignedPartnerName || booking.partnerName || booking.partner;
                   const isAssigned = Boolean(assignedPartner && assignedPartner !== 'Unassigned' && assignedPartner.trim() !== '');
+                  const scrapWeight = booking.scrapWeight || booking.weight || booking.collectedWeight || booking.quantity;
 
                   return (
                     <tr key={booking.bookingId || Math.random()} className="hover:bg-slate-50/50 dark:hover:bg-slate-850/30 transition-colors">
@@ -155,6 +173,16 @@ const BookingsTable = ({ bookings }) => {
                       <td className={`${tdPadding}`}>
                         <div className="font-semibold text-slate-700 dark:text-slate-300">{booking.serviceName || '—'}</div>
                         <div className="text-[10px] text-slate-400 dark:text-slate-500 mt-0.5">{(booking.subService || '').replace('\n', ' ')}</div>
+                        
+                        {/* Scrap Weight Badge if available */}
+                        {scrapWeight && (
+                          <div className="mt-1">
+                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-bold bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 border border-emerald-100 dark:border-emerald-900/30">
+                              <Recycle className="h-3 w-3 text-emerald-600 dark:text-emerald-400" />
+                              Weight: {scrapWeight}
+                            </span>
+                          </div>
+                        )}
                       </td>
 
                       {/* Assigned Partner Column (Prominently displayed) */}
@@ -192,11 +220,11 @@ const BookingsTable = ({ bookings }) => {
                       {/* Status */}
                       <td className={tdPadding}>{getStatusBadge(booking.status)}</td>
 
-                      {/* Schedule */}
+                      {/* Schedule Date */}
                       <td className={tdPadding}>
-                        <div className="flex items-center gap-1.5 font-medium text-slate-600 dark:text-slate-350">
+                        <div className="flex items-center gap-1.5 font-semibold text-slate-700 dark:text-slate-300">
                           <Calendar className="h-3.5 w-3.5 text-slate-400" />
-                          {booking.date || 'Today'}
+                          {formatDate(booking)}
                         </div>
                         <div className="text-[10px] text-slate-400 mt-0.5 ml-5">{booking.time || '—'}</div>
                       </td>
@@ -229,7 +257,7 @@ const BookingsTable = ({ bookings }) => {
               onChange={(e) => { setRowsPerPage(Number(e.target.value)); setCurrentPage(1); }}
               className="bg-transparent font-bold text-slate-700 dark:text-slate-350 outline-none cursor-pointer border border-slate-200 dark:border-slate-800 px-2.5 py-1 rounded-lg"
             >
-              {[5, 10, 25, 50].map((size) => (
+              {[10, 25, 50, 100].map((size) => (
                 <option key={size} value={size} className="bg-white dark:bg-slate-900">{size} rows</option>
               ))}
             </select>

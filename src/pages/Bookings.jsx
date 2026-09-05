@@ -7,11 +7,12 @@ import BookingFilter from '../components/BookingFilter';
 const fallbackBookings = [
   { bookingId: 'BK-9821', customerName: 'Sarah Jenkins', customerPhone: '+91 98450 11223', serviceName: 'House Deep Cleaning', subService: '3BHK Comprehensive Sanitization', amount: 3499, status: 'confirmed', assignedPartnerName: 'Marcus Vance', assignedPartnerPhone: '+91 98450 99881', date: '2026-09-05', time: '10:00 AM', paymentMethod: 'UPI / Online', createdAt: '2026-09-05T08:30:00Z' },
   { bookingId: 'BK-9820', customerName: 'David Miller', customerPhone: '+91 98451 22334', serviceName: 'Vehicle Cleaning', subService: 'SUV Foam Wash & Interior Detailing', amount: 1299, status: 'assigned', assignedPartnerName: 'Aisha Rahman', assignedPartnerPhone: '+91 98451 88772', date: '2026-09-05', time: '11:30 AM', paymentMethod: 'Razorpay / Card', createdAt: '2026-09-05T09:00:00Z' },
-  { bookingId: 'BK-9819', customerName: 'Elena Rostova', customerPhone: '+91 98452 33445', serviceName: 'Kitchen Deep Clean', subService: 'Degreasing & Chimney Sanitization', amount: 1899, status: 'completed', assignedPartnerName: 'John Sterling', assignedPartnerPhone: '+91 98452 77663', date: '2026-09-04', time: '02:00 PM', paymentMethod: 'UPI / GPay', createdAt: '2026-09-04T12:00:00Z' },
+  { bookingId: 'BK-9819', customerName: 'Elena Rostova', customerPhone: '+91 98452 33445', serviceName: 'Scrap & Recycling', subService: 'Electronic Scrap & Old Appliances', scrapWeight: '24.5 kg', amount: 850, status: 'completed', assignedPartnerName: 'John Sterling', assignedPartnerPhone: '+91 98452 77663', date: '2026-09-04', time: '02:00 PM', paymentMethod: 'Cash to Partner', createdAt: '2026-09-04T12:00:00Z' },
   { bookingId: 'BK-9818', customerName: 'Michael Chen', customerPhone: '+91 98453 44556', serviceName: 'House Deep Cleaning', subService: '2BHK Move-in Deep Clean', amount: 2799, status: 'pending', assignedPartnerName: '', assignedPartnerPhone: '', date: '2026-09-05', time: '04:00 PM', paymentMethod: 'Cash on Service', createdAt: '2026-09-05T09:45:00Z' },
   { bookingId: 'BK-9817', customerName: 'Amanda Ross', customerPhone: '+91 98454 55667', serviceName: 'Vehicle Cleaning', subService: 'Sedan Exterior Steam Wash', amount: 899, status: 'in-progress', assignedPartnerName: 'Carlos Mendez', assignedPartnerPhone: '+91 98453 66554', date: '2026-09-05', time: '01:00 PM', paymentMethod: 'UPI / PhonePe', createdAt: '2026-09-05T10:15:00Z' },
-  { bookingId: 'BK-9816', customerName: 'Anil Kumble', customerPhone: '+91 98455 66778', serviceName: 'Bathroom Deep Clean', subService: 'Tile Descaling & Stain Removal', amount: 999, status: 'completed', assignedPartnerName: 'Zoe Winters', assignedPartnerPhone: '+91 98454 55443', date: '2026-09-04', time: '05:30 PM', paymentMethod: 'Card / NetBanking', createdAt: '2026-09-04T14:30:00Z' },
+  { bookingId: 'BK-9816', customerName: 'Anil Kumble', customerPhone: '+91 98455 66778', serviceName: 'Scrap & Recycling', subService: 'Metal Extraction & Copper Wire Scrap', scrapWeight: '18.0 kg', amount: 1200, status: 'completed', assignedPartnerName: 'Zoe Winters', assignedPartnerPhone: '+91 98454 55443', date: '2026-09-04', time: '05:30 PM', paymentMethod: 'UPI', createdAt: '2026-09-04T14:30:00Z' },
   { bookingId: 'BK-9815', customerName: 'Rashmi Verma', customerPhone: '+91 98456 77889', serviceName: 'Sofa & Upholstery Cleaning', subService: '5-Seater Shampoo Treatment', amount: 1599, status: 'confirmed', assignedPartnerName: 'Kevin Hart', assignedPartnerPhone: '+91 98455 44332', date: '2026-09-06', time: '09:30 AM', paymentMethod: 'UPI', createdAt: '2026-09-05T11:00:00Z' },
+  { bookingId: 'BK-9814', customerName: 'Sanjay Dutt', customerPhone: '+91 98457 88990', serviceName: 'Scrap & Recycling', subService: 'Heavy Appliance Scrap & Battery Units', scrapWeight: '42.0 kg', amount: 2150, status: 'assigned', assignedPartnerName: 'Marcus Vance', assignedPartnerPhone: '+91 98450 99881', date: '2026-09-05', time: '03:15 PM', paymentMethod: 'UPI / GPay', createdAt: '2026-09-05T11:30:00Z' },
 ];
 
 const Bookings = () => {
@@ -51,14 +52,16 @@ const Bookings = () => {
   }, [fetchBookings]);
 
   // Derived Metrics (filtered by category)
-  const isHouseCleaning = (serviceName) => /house|home|deep|kitchen|bathroom|cleaning|sofa/i.test(serviceName) && !/vehicle|car|bike|wash/i.test(serviceName);
-  const isVehicleCleaning = (serviceName) => /vehicle|car|bike|wash/i.test(serviceName);
+  const isHouseCleaning = (serviceName) => /house|home|deep|kitchen|bathroom|cleaning|sofa/i.test(serviceName) && !/vehicle|car|bike|wash|scrap|recycl/i.test(serviceName);
+  const isVehicleCleaning = (serviceName) => /vehicle|car|bike|wash|auto/i.test(serviceName);
+  const isScrapRecycling = (serviceName) => /scrap|recycl|metal|electronic|copper|battery|waste|shredding|smelting/i.test(serviceName);
 
   const filteredBookings = bookings.filter(b => {
     if (selectedCategory === 'All') return true;
     const name = b.serviceName || '';
     if (selectedCategory === 'House Cleaning') return isHouseCleaning(name);
     if (selectedCategory === 'Vehicle Cleaning') return isVehicleCleaning(name);
+    if (selectedCategory === 'Scrap & Recycling') return isScrapRecycling(name);
     return true;
   });
 

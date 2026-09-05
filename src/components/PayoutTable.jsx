@@ -11,7 +11,7 @@ const PayoutTable = ({ partners, onPayoutProcessed }) => {
   const [sortField, setSortField] = useState(null);
   const [sortDirection, setSortDirection] = useState(null);
   const [currentPage, setCurrentPage] = useState(1);
-  const [rowsPerPage, setRowsPerPage] = useState(10);
+  const [rowsPerPage, setRowsPerPage] = useState(50);
   
   const [selectedPartner, setSelectedPartner] = useState(null);
   const [isBankModalOpen, setIsBankModalOpen] = useState(false);
@@ -255,7 +255,7 @@ const PayoutTable = ({ partners, onPayoutProcessed }) => {
               onChange={(e) => { setRowsPerPage(Number(e.target.value)); setCurrentPage(1); }}
               className="bg-transparent font-bold text-slate-700 dark:text-slate-350 outline-none cursor-pointer border border-slate-200 dark:border-slate-800 px-2.5 py-1 rounded-lg"
             >
-              {[5, 10, 25].map((size) => (
+              {[10, 25, 50, 100].map((size) => (
                 <option key={size} value={size} className="bg-white dark:bg-slate-900">{size} rows</option>
               ))}
             </select>

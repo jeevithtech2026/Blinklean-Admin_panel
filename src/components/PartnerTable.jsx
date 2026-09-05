@@ -1,8 +1,9 @@
 import React, { useState, useMemo, useEffect } from 'react';
-import { ShieldAlert, ArrowUpDown, ChevronLeft, ChevronRight, Search, CheckCircle, Clock, XCircle, Building2, UserCheck } from 'lucide-react';
+import { ShieldAlert, ArrowUpDown, ChevronLeft, ChevronRight, Search, CheckCircle, Clock, XCircle, Building2, UserCheck, Phone } from 'lucide-react';
 import { useTheme } from '../context/ThemeContext';
 import BankDetailsModal from './BankDetailsModal';
 import PartnerVerificationModal from './PartnerVerificationModal';
+import EditPartnerPhoneModal from './EditPartnerPhoneModal';
 
 const PartnerTable = ({ partners }) => {
   const { density } = useTheme();
@@ -11,11 +12,13 @@ const PartnerTable = ({ partners }) => {
   const [sortField, setSortField] = useState(null);
   const [sortDirection, setSortDirection] = useState(null);
   const [currentPage, setCurrentPage] = useState(1);
-  const [rowsPerPage, setRowsPerPage] = useState(10);
+  const [rowsPerPage, setRowsPerPage] = useState(50);
   const [selectedPartner, setSelectedPartner] = useState(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedVerifyPartner, setSelectedVerifyPartner] = useState(null);
   const [isVerifyModalOpen, setIsVerifyModalOpen] = useState(false);
+  const [selectedPhonePartner, setSelectedPhonePartner] = useState(null);
+  const [isPhoneModalOpen, setIsPhoneModalOpen] = useState(false);
   const [, forceUpdate] = useState(0);
 
   useEffect(() => {
@@ -129,6 +132,7 @@ const PartnerTable = ({ partners }) => {
                 paginatedPartners.map((partner) => (
                   <tr key={partner.id} className="hover:bg-slate-50/50 dark:hover:bg-slate-850/30 transition-colors">
                     {/* Partner Name & ID */}
+                    {/* Partner Name & ID & Contact */}
                     <td className={tdPadding}>
                       <div className="flex items-center gap-3">
                         <div className={`flex items-center justify-center bg-violet-50 dark:bg-violet-950/30 border border-violet-100 dark:border-violet-900/40 font-bold text-violet-700 dark:text-violet-400 ${avatarSize}`}>
@@ -137,8 +141,21 @@ const PartnerTable = ({ partners }) => {
                         <div>
                           <div className="font-bold text-slate-900 dark:text-white leading-tight">{partner.name || '—'}</div>
                           <div className="text-[10px] font-mono text-slate-400 dark:text-slate-500 mt-0.5">{partner.email || partner.id?.slice(0, 16) + '...'}</div>
-                          <div className="text-[10px] text-slate-500 dark:text-slate-400 mt-0.5 font-semibold">
-                            {partner.phoneNumber || partner.personalInfo?.phone || partner.phone || 'No Contact'}
+                          <div className="flex items-center gap-1.5 mt-0.5">
+                            <span className="text-[10px] text-slate-700 dark:text-slate-300 font-bold flex items-center gap-1">
+                              <Phone className="h-3 w-3 text-violet-500" />
+                              {partner.phoneNumber || partner.personalInfo?.phone || partner.phone || 'No Contact'}
+                            </span>
+                            <button
+                              onClick={() => {
+                                setSelectedPhonePartner(partner);
+                                setIsPhoneModalOpen(true);
+                              }}
+                              className="text-[9px] font-bold text-violet-600 hover:text-violet-700 dark:text-violet-400 bg-violet-50 dark:bg-violet-950/50 hover:bg-violet-100 px-1.5 py-0.5 rounded transition-colors"
+                              title="Edit Contact Number"
+                            >
+                              Edit Phone
+                            </button>
                           </div>
                         </div>
                       </div>
@@ -178,13 +195,24 @@ const PartnerTable = ({ partners }) => {
                       {partner.createdAt ? new Date(partner.createdAt).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) : '—'}
                     </td>
                     {/* Actions */}
-                    <td className={`${tdPadding} text-right flex items-center justify-end gap-2`}>
+                    <td className={`${tdPadding} text-right flex items-center justify-end gap-1.5`}>
+                      <button 
+                        onClick={() => {
+                          setSelectedPhonePartner(partner);
+                          setIsPhoneModalOpen(true);
+                        }}
+                        className="inline-flex items-center gap-1 px-2.5 py-1.5 bg-slate-100 dark:bg-slate-800 hover:bg-violet-100 dark:hover:bg-violet-900/40 text-slate-700 dark:text-slate-300 hover:text-violet-700 dark:hover:text-violet-400 rounded-lg text-xs font-bold transition-colors"
+                        title="Edit Contact Number"
+                      >
+                        <Phone className="h-3.5 w-3.5" />
+                        Phone
+                      </button>
                       <button 
                         onClick={() => {
                           setSelectedPartner(partner);
                           setIsModalOpen(true);
                         }}
-                        className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-slate-100 dark:bg-slate-800 hover:bg-violet-100 dark:hover:bg-violet-900/40 text-slate-700 dark:text-slate-300 hover:text-violet-700 dark:hover:text-violet-400 rounded-lg text-xs font-bold transition-colors"
+                        className="inline-flex items-center gap-1.5 px-2.5 py-1.5 bg-slate-100 dark:bg-slate-800 hover:bg-violet-100 dark:hover:bg-violet-900/40 text-slate-700 dark:text-slate-300 hover:text-violet-700 dark:hover:text-violet-400 rounded-lg text-xs font-bold transition-colors"
                       >
                         <Building2 className="h-3.5 w-3.5" />
                         Bank
@@ -194,7 +222,7 @@ const PartnerTable = ({ partners }) => {
                           setSelectedVerifyPartner(partner);
                           setIsVerifyModalOpen(true);
                         }}
-                        className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-slate-100 dark:bg-slate-800 hover:bg-violet-100 dark:hover:bg-violet-900/40 text-slate-700 dark:text-slate-300 hover:text-violet-700 dark:hover:text-violet-400 rounded-lg text-xs font-bold transition-colors"
+                        className="inline-flex items-center gap-1.5 px-2.5 py-1.5 bg-slate-100 dark:bg-slate-800 hover:bg-violet-100 dark:hover:bg-violet-900/40 text-slate-700 dark:text-slate-300 hover:text-violet-700 dark:hover:text-violet-400 rounded-lg text-xs font-bold transition-colors"
                       >
                         <UserCheck className="h-3.5 w-3.5" />
                         Verify
@@ -228,7 +256,7 @@ const PartnerTable = ({ partners }) => {
               onChange={(e) => { setRowsPerPage(Number(e.target.value)); setCurrentPage(1); }}
               className="bg-transparent font-bold text-slate-700 dark:text-slate-350 outline-none cursor-pointer border border-slate-200 dark:border-slate-800 px-2.5 py-1 rounded-lg"
             >
-              {[5, 10, 25].map((size) => (
+              {[10, 25, 50, 100].map((size) => (
                 <option key={size} value={size} className="bg-white dark:bg-slate-900">{size} rows</option>
               ))}
             </select>
@@ -267,6 +295,23 @@ const PartnerTable = ({ partners }) => {
           if (index !== -1) {
             partners[index].kycStatus = newKycStatus;
             partners[index].status = newStatus;
+          }
+          forceUpdate(x => x + 1);
+        }}
+      />
+
+      <EditPartnerPhoneModal
+        isOpen={isPhoneModalOpen}
+        onClose={() => setIsPhoneModalOpen(false)}
+        partner={selectedPhonePartner}
+        onUpdate={(id, newPhone) => {
+          const index = partners.findIndex(p => p.id === id);
+          if (index !== -1) {
+            partners[index].phoneNumber = newPhone;
+            partners[index].phone = newPhone;
+            if (partners[index].personalInfo) {
+              partners[index].personalInfo.phone = newPhone;
+            }
           }
           forceUpdate(x => x + 1);
         }}

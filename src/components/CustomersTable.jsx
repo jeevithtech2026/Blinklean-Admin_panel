@@ -10,11 +10,31 @@ const CustomersTable = ({ customers }) => {
   const [sortField, setSortField] = useState(null);
   const [sortDirection, setSortDirection] = useState(null);
   const [currentPage, setCurrentPage] = useState(1);
-  const [rowsPerPage, setRowsPerPage] = useState(10);
+  const [rowsPerPage, setRowsPerPage] = useState(50);
 
   useEffect(() => {
     setCurrentPage(1);
   }, [searchQuery, customers.length]);
+
+  const formatAddress = (c) => {
+    if (!c) return 'Location Unknown';
+    if (typeof c.address === 'object' && c.address !== null) {
+      const parts = [
+        c.address.houseNumber || c.address.building || c.address.doorNo,
+        c.address.street || c.address.streetAddress || c.address.line1,
+        c.address.area || c.address.locality || c.address.line2,
+        c.address.city || c.city,
+        c.address.state,
+        c.address.pincode || c.address.zipCode ? `PIN: ${c.address.pincode || c.address.zipCode}` : null
+      ].filter(Boolean);
+      return parts.length > 0 ? parts.join(', ') : 'Location Unknown';
+    }
+    return c.fullAddress || c.address || c.formattedAddress || c.location || c.city || 'Location Unknown';
+  };
+
+  const formatPhone = (c) => {
+    return c.phone || c.phoneNumber || c.mobile || c.contact || c.phoneNo || '—';
+  };
 
   const filteredCustomers = useMemo(() => {
     const query = searchQuery.trim().toLowerCase();
@@ -22,8 +42,9 @@ const CustomersTable = ({ customers }) => {
     return customers.filter((c) =>
       (c.name || '').toLowerCase().includes(query) ||
       (c.email || '').toLowerCase().includes(query) ||
-      (c.phone || '').toLowerCase().includes(query) ||
-      (c.userId || '').toLowerCase().includes(query)
+      formatPhone(c).toLowerCase().includes(query) ||
+      formatAddress(c).toLowerCase().includes(query) ||
+      (c.userId || c.id || '').toLowerCase().includes(query)
     );
   }, [customers, searchQuery]);
 
@@ -67,8 +88,8 @@ const CustomersTable = ({ customers }) => {
       Customer_ID: c.userId || c.id || 'N/A',
       Name: c.name || 'Anonymous User',
       Email: c.email || 'N/A',
-      Phone: c.phone || 'N/A',
-      Location: c.city || c.address || 'Unknown',
+      Phone: formatPhone(c),
+      Location: formatAddress(c),
       Registered_Date: c.createdAt ? new Date(c.createdAt).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' }) : 'N/A'
     }));
   };
@@ -145,17 +166,17 @@ const CustomersTable = ({ customers }) => {
                           <UserCircle className="h-3.5 w-3.5 text-slate-400" />
                           {customer.email || '—'}
                         </div>
-                        <div className="flex items-center gap-1.5 font-medium text-slate-600 dark:text-slate-400 text-xs">
-                          <Phone className="h-3.5 w-3.5 text-slate-400" />
-                          {customer.phone || '—'}
+                        <div className="flex items-center gap-1.5 font-semibold text-slate-800 dark:text-slate-200 text-xs">
+                          <Phone className="h-3.5 w-3.5 text-violet-500" />
+                          {formatPhone(customer)}
                         </div>
                       </div>
                     </td>
-                    {/* Location */}
+                    {/* Location / Full Address */}
                     <td className={tdPadding}>
-                      <div className="flex items-center gap-1.5 font-medium text-slate-600 dark:text-slate-350">
-                        <MapPin className="h-4 w-4 text-slate-400" />
-                        {customer.city || customer.address || 'Location Unknown'}
+                      <div className="flex items-start gap-1.5 font-medium text-slate-700 dark:text-slate-300 max-w-sm">
+                        <MapPin className="h-4 w-4 text-slate-400 shrink-0 mt-0.5" />
+                        <span className="leading-snug">{formatAddress(customer)}</span>
                       </div>
                     </td>
                     {/* Registered Date */}
@@ -193,7 +214,7 @@ const CustomersTable = ({ customers }) => {
               onChange={(e) => { setRowsPerPage(Number(e.target.value)); setCurrentPage(1); }}
               className="bg-transparent font-bold text-slate-700 dark:text-slate-350 outline-none cursor-pointer border border-slate-200 dark:border-slate-800 px-2.5 py-1 rounded-lg"
             >
-              {[5, 10, 25, 50].map((size) => (
+              {[10, 25, 50, 100].map((size) => (
                 <option key={size} value={size} className="bg-white dark:bg-slate-900">{size} rows</option>
               ))}
             </select>

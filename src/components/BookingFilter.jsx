@@ -1,11 +1,12 @@
 import React from 'react';
-import { Layers, Home, Car } from 'lucide-react';
+import { Layers, Home, Car, Recycle } from 'lucide-react';
 
 const BookingFilter = ({ selectedCategory, onChange }) => {
   const categories = [
     { id: 'All', label: 'All Bookings', icon: Layers },
     { id: 'House Cleaning', label: 'House Cleaning', icon: Home },
     { id: 'Vehicle Cleaning', label: 'Vehicle Cleaning', icon: Car },
+    { id: 'Scrap & Recycling', label: 'Scrap & Recycling', icon: Recycle },
   ];
 
   return (
