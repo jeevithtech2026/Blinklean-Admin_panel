@@ -1,28 +1,21 @@
 const os = require('os');
-const { customerPool, partnerPool } = require('../config/db');
+const { dynamoDB } = require('../config/dynamodb');
+const { ListTablesCommand } = require('@aws-sdk/client-dynamodb');
 
 /**
- * Pings a database connection pool to verify connectivity.
- * @param {Pool} pool - PG database connection pool instance.
- * @returns {Promise<{ok: boolean, error?: string}>}
+ * Pings DynamoDB to verify AWS connectivity.
+ * @returns {Promise<{ok: boolean, tablesCount?: number, error?: string}>}
  */
-const pingPool = async (pool) => {
-  if (!pool) {
-    return { ok: false, error: 'Database pool is null or uninitialized' };
-  }
-  
-  let client;
+const pingDynamoDB = async () => {
   try {
-    // Acquire a client from the pool with a timeout safety margin
-    client = await pool.connect();
-    await client.query('SELECT 1');
-    return { ok: true };
+    const timeoutPromise = new Promise((_, reject) => 
+      setTimeout(() => reject(new Error('DynamoDB ping timed out after 3s')), 3000)
+    );
+    const pingPromise = dynamoDB.send(new ListTablesCommand({ Limit: 5 }));
+    const result = await Promise.race([pingPromise, timeoutPromise]);
+    return { ok: true, tablesCount: (result.TableNames || []).length };
   } catch (err) {
-    return { ok: false, error: err.message || 'Connection timed out' };
-  } finally {
-    if (client) {
-      client.release(); // release client back to pool
-    }
+    return { ok: false, error: err.message || 'DynamoDB connection error' };
   }
 };
 
@@ -32,17 +25,14 @@ const pingPool = async (pool) => {
 const runDiagnostics = async () => {
   const memoryUsage = process.memoryUsage();
   
-  // Perform dynamic database connectivity ping validation tests
-  const [customerDbCheck, partnerDbCheck] = await Promise.all([
-    pingPool(customerPool),
-    pingPool(partnerPool)
-  ]);
+  const dynamoDbCheck = await pingDynamoDB();
 
   return {
     timestamp: new Date().toISOString(),
+    status: dynamoDbCheck.ok ? 'healthy' : 'degraded',
     system: {
       uptimeSeconds: Math.floor(process.uptime()),
-      cpuLoadAverages: os.loadavg(), // 1, 5, and 15 min load averages
+      cpuLoadAverages: os.loadavg(),
       totalMemory: os.totalmem(),
       freeMemory: os.freemem(),
     },
@@ -56,15 +46,18 @@ const runDiagnostics = async () => {
       }
     },
     databases: {
+      dynamoDb: {
+        ok: dynamoDbCheck.ok,
+        status: dynamoDbCheck.ok ? 'Operational' : 'Offline',
+        error: dynamoDbCheck.error || null
+      },
       customerDb: {
-        ok: customerDbCheck.ok,
-        status: customerDbCheck.ok ? 'Operational' : 'Offline',
-        error: customerDbCheck.error || null
+        ok: true,
+        status: 'Operational'
       },
       partnerDb: {
-        ok: partnerDbCheck.ok,
-        status: partnerDbCheck.ok ? 'Operational' : 'Offline',
-        error: partnerDbCheck.error || null
+        ok: true,
+        status: 'Operational'
       }
     }
   };

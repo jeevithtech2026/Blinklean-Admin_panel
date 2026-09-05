@@ -62,25 +62,29 @@ axiosInstance.interceptors.response.use(
     );
     
     const status = error.response?.status;
-    // Check if error is a network connection failure or fits a 4xx/5xx gateway response
+    const url = error.config?.url || '';
+    
+    // Check if error is 401 unauthorized
     if (status === 401) {
-      // Clear expired credentials from storage
-      localStorage.removeItem('admin_token');
-      localStorage.removeItem('admin_user');
-      
+      // If token exists and is invalid, clear credentials
+      if (localStorage.getItem('admin_token')) {
+        localStorage.removeItem('admin_token');
+        localStorage.removeItem('admin_user');
+        
+        triggerGlobalNotification(
+          'Session expired. Redirecting to login...',
+          'error'
+        );
+        
+        setTimeout(() => {
+          window.location.href = '/login';
+        }, 1500);
+      }
+    } else if (error.config?.method !== 'get' && status && status >= 500) {
+      // Only show global notification for failed mutations (POST/PUT/DELETE)
+      const errorMsg = error.response?.data?.message || error.response?.data?.error || error.message || 'Server error';
       triggerGlobalNotification(
-        'Session expired. Redirecting to login...',
-        'error'
-      );
-      
-      // Force page redirection to login page to re-authenticate
-      setTimeout(() => {
-        window.location.href = '/login';
-      }, 1500);
-    } else if (!status || (status >= 400 && status < 600)) {
-      const errorMsg = error.response?.data?.message || error.message || 'Connection refused';
-      triggerGlobalNotification(
-        `API Failure (${status || 'Network Connection Error'}): ${errorMsg}. Please verify your AWS API Gateway/Lambda gateway connectivity.`,
+        `Action Failed (${status}): ${errorMsg}`,
         'error'
       );
     }
