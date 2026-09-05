@@ -24,7 +24,7 @@ const Dashboard = () => {
   const [activeTab, setActiveTab] = useState('overview'); // 'overview' | 'customers' | 'partners' | 'bookings' | 'verification-codes' | 'payouts'
   
   const [metrics, setMetrics] = useState({
-    customers: { title: 'Total Registered Users', value: '0', trend: '', isPositive: true, icon: Users },
+    customers: { title: 'Complete Customer Profiles', value: '0', trend: '', isPositive: true, icon: Users },
     partners: { title: 'Total Registered Partners', value: '0', trend: '', isPositive: true, icon: UserCheck },
     bookings: { title: 'Active Bookings Today', value: '0', trend: '', isPositive: false, icon: Calendar },
     completions: { title: 'Total Completed Services', value: '0', trend: '', isPositive: true, icon: CheckCircle2 },
@@ -38,7 +38,7 @@ const Dashboard = () => {
   });
 
   const fallbackMetrics = {
-    customers: { title: 'Total Registered Users', value: '12,480', trend: '+12.5%', isPositive: true, icon: Users },
+    customers: { title: 'Complete Customer Profiles', value: '34', trend: '+100% complete', isPositive: true, icon: Users },
     partners: { title: 'Total Registered Partners', value: '348', trend: '+4.2%', isPositive: true, icon: UserCheck },
     bookings: { title: 'Active Bookings Today', value: '95', trend: '-1.8%', isPositive: false, icon: Calendar },
     completions: { title: 'Total Completed Services', value: '1,248', trend: '+8.6%', isPositive: true, icon: CheckCircle2 },
@@ -56,7 +56,7 @@ const Dashboard = () => {
         const apiData = response.data;
         console.log('[Dashboard] Successfully retrieved dashboard summary:', apiData);
         setMetrics({
-          customers: { title: 'Total Registered Users', value: apiData.customers || '0', trend: apiData.customersTrend || '', isPositive: apiData.customersIsPositive !== false, icon: Users },
+          customers: { title: 'Complete Customer Profiles', value: apiData.customers || '0', trend: apiData.customersTrend || '', isPositive: apiData.customersIsPositive !== false, icon: Users },
           partners: { title: 'Total Registered Partners', value: apiData.partners || '0', trend: apiData.partnersTrend || '', isPositive: apiData.partnersIsPositive !== false, icon: UserCheck },
           bookings: { title: 'Active Bookings Today', value: apiData.bookings || '0', trend: apiData.bookingsTrend || '', isPositive: apiData.bookingsIsPositive !== false, icon: Calendar },
           completions: { title: 'Total Completed Services', value: apiData.completions || '1,248', trend: apiData.completionsTrend || '+8.6%', isPositive: apiData.completionsIsPositive !== false, icon: CheckCircle2 },

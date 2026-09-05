@@ -65,11 +65,13 @@ router.get('/users', async (req, res) => {
       const custArea = b.serviceArea || '';
       const isCompleted = (b.status || '').toLowerCase() === 'completed';
 
-      // Match existing user by userId or by exact phone number
+      // Match existing user by userId or by normalized 10-digit phone number
       let existing = userMap.get(userId);
-      if (!existing && custPhone) {
+      const cClean = custPhone ? custPhone.replace(/[^0-9]/g, '').slice(-10) : '';
+      if (!existing && cClean && cClean.length >= 10) {
         for (const [, uObj] of userMap.entries()) {
-          if (uObj.phone && uObj.phone === custPhone) {
+          const uClean = (uObj.phone || '').replace(/[^0-9]/g, '').slice(-10);
+          if (uClean && uClean === cClean) {
             existing = uObj;
             break;
           }
@@ -77,14 +79,14 @@ router.get('/users', async (req, res) => {
       }
 
       if (existing) {
-        if (!existing.name || existing.name.startsWith('Customer-')) {
-          if (custName) existing.name = custName;
+        if (!existing.name || existing.name.startsWith('Customer-') || existing.name.startsWith('Customer (')) {
+          if (custName && !custName.startsWith('Customer-')) existing.name = custName;
         }
         if (!existing.phone || existing.phone === '—' || existing.phone === '') {
           if (custPhone) existing.phone = custPhone;
         }
         if (!existing.address || existing.address === 'Bengaluru' || existing.address === '') {
-          if (custAddress) existing.address = custAddress;
+          if (custAddress && custAddress !== 'Bengaluru') existing.address = custAddress;
         }
         if (!existing.servicePin || existing.servicePin === '—') {
           if (custPin) existing.servicePin = custPin;
@@ -98,7 +100,7 @@ router.get('/users', async (req, res) => {
         }
       } else {
         // Create user entry from booking
-        const newId = userId !== 'guest' ? userId : (`cust_${custPhone || Math.random().toString(36).slice(2, 8)}`);
+        const newId = userId !== 'guest' ? userId : (`cust_${custPhone ? custPhone.replace(/[^0-9]/g, '') : Math.random().toString(36).slice(2, 8)}`);
         userMap.set(newId, {
           userId: newId,
           name: custName || (custPhone ? `Customer (${custPhone.slice(-4)})` : `Customer-${newId.slice(0, 6)}`),
@@ -138,20 +140,35 @@ router.get('/users', async (req, res) => {
       };
     });
 
-    // Sort: Users with phone numbers, names, and recent bookings first
-    normalizedUsers.sort((a, b) => {
-      const aHasPhone = a.phone && a.phone !== '—' ? 1 : 0;
-      const bHasPhone = b.phone && b.phone !== '—' ? 1 : 0;
-      if (bHasPhone !== aHasPhone) return bHasPhone - aHasPhone;
+    // 6. Filter: ONLY return fully completed customer profiles (Real name, contact phone, and exact physical address)
+    const completedOnly = req.query.all !== 'true';
+    let filteredUsers = normalizedUsers;
 
-      const aHasName = a.name && !a.name.startsWith('Customer-') ? 1 : 0;
-      const bHasName = b.name && !b.name.startsWith('Customer-') ? 1 : 0;
-      if (bHasName !== aHasName) return bHasName - aHasName;
+    if (completedOnly) {
+      filteredUsers = normalizedUsers.filter(u => {
+        const cleanDigits = (u.phone || '').replace(/[^0-9]/g, '');
+        const hasPhone = cleanDigits.length >= 8;
+        const hasRealName = u.name && 
+                            u.name.trim() !== '' && 
+                            !u.name.startsWith('Customer-') && 
+                            !u.name.startsWith('Customer (') && 
+                            !u.name.startsWith('User-') && 
+                            !u.name.startsWith('cust_') &&
+                            u.name !== 'Anonymous User' &&
+                            u.name !== '—';
+        const hasAddress = u.address && 
+                           u.address !== '—' && 
+                           u.address.trim() !== '' && 
+                           u.address !== 'Location Unknown';
+        
+        return hasPhone && hasRealName && hasAddress;
+      });
+    }
 
-      return (b.totalBookings || 0) - (a.totalBookings || 0);
-    });
+    // Sort: Customers with highest booking activity and detailed addresses first
+    filteredUsers.sort((a, b) => (b.totalBookings || 0) - (a.totalBookings || 0));
 
-    res.json({ success: true, count: normalizedUsers.length, data: normalizedUsers });
+    res.json({ success: true, count: filteredUsers.length, data: filteredUsers, isFilteredCompletedOnly: completedOnly });
   } catch (err) {
     console.error('[Users] Scan and enrichment error:', err.message);
     res.status(500).json({ success: false, error: err.message });

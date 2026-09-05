@@ -97,9 +97,9 @@ const Customers = () => {
       {/* Header section */}
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight text-slate-900 dark:text-white">Customer & User Directory</h1>
+          <h1 className="text-2xl font-bold tracking-tight text-slate-900 dark:text-white">Customer Directory (Completed Profiles Only)</h1>
           <p className="text-sm text-slate-500 dark:text-slate-400">
-            Real contact numbers, exact physical addresses, and booking history extracted from AWS DynamoDB.
+            Displaying only customers with 100% complete details (verified real full name, active contact number, and exact physical address).
           </p>
         </div>
 
@@ -137,49 +137,49 @@ const Customers = () => {
         {/* Total Customers */}
         <div className="rounded-2xl border border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-900 p-5 shadow-sm">
           <div className="flex items-center justify-between">
-            <span className="text-xs font-bold uppercase tracking-wider text-slate-400">Total Registered Users</span>
+            <span className="text-xs font-bold uppercase tracking-wider text-slate-400">Complete Customer Profiles</span>
             <span className="rounded-xl bg-blue-50 dark:bg-blue-950/40 p-2.5 text-blue-600 dark:text-blue-400">
               <Users className="h-5 w-5" />
             </span>
           </div>
           <div className="mt-3 flex items-baseline gap-2">
             <span className="text-2xl font-bold tracking-tight text-slate-900 dark:text-white">{totalCustomers}</span>
-            <span className="text-xs font-semibold text-emerald-600 dark:text-emerald-400">Active</span>
+            <span className="text-xs font-semibold text-emerald-600 dark:text-emerald-400">100% Complete</span>
           </div>
         </div>
 
         {/* Contact Numbers Extracted */}
         <div className="rounded-2xl border border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-900 p-5 shadow-sm">
           <div className="flex items-center justify-between">
-            <span className="text-xs font-bold uppercase tracking-wider text-slate-400">Contact Numbers Extracted</span>
+            <span className="text-xs font-bold uppercase tracking-wider text-slate-400">Verified Contact Numbers</span>
             <span className="rounded-xl bg-emerald-50 dark:bg-emerald-950/40 p-2.5 text-emerald-600 dark:text-emerald-400">
               <Phone className="h-5 w-5" />
             </span>
           </div>
           <div className="mt-3 flex items-baseline gap-2">
             <span className="text-2xl font-bold tracking-tight text-slate-900 dark:text-white">{customersWithPhone}</span>
-            <span className="text-xs font-semibold text-emerald-600 dark:text-emerald-400">Available to call/WhatsApp</span>
+            <span className="text-xs font-semibold text-emerald-600 dark:text-emerald-400">Call / WhatsApp Ready</span>
           </div>
         </div>
 
         {/* Exact Physical Addresses */}
         <div className="rounded-2xl border border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-900 p-5 shadow-sm">
           <div className="flex items-center justify-between">
-            <span className="text-xs font-bold uppercase tracking-wider text-slate-400">Exact Physical Addresses</span>
+            <span className="text-xs font-bold uppercase tracking-wider text-slate-400">Exact Delivery Addresses</span>
             <span className="rounded-xl bg-rose-50 dark:bg-rose-950/40 p-2.5 text-rose-600 dark:text-rose-400">
               <MapPin className="h-5 w-5" />
             </span>
           </div>
           <div className="mt-3 flex items-baseline gap-2">
             <span className="text-2xl font-bold tracking-tight text-slate-900 dark:text-white">{customersWithAddress}</span>
-            <span className="text-xs font-semibold text-rose-600 dark:text-rose-400">Location Detailed</span>
+            <span className="text-xs font-semibold text-rose-600 dark:text-rose-400">Street & Pin Details</span>
           </div>
         </div>
 
         {/* Verified Accounts */}
         <div className="rounded-2xl border border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-900 p-5 shadow-sm">
           <div className="flex items-center justify-between">
-            <span className="text-xs font-bold uppercase tracking-wider text-slate-400">Verified Service PINs</span>
+            <span className="text-xs font-bold uppercase tracking-wider text-slate-400">Service PIN Verified</span>
             <span className="rounded-xl bg-indigo-50 dark:bg-indigo-950/40 p-2.5 text-indigo-600 dark:text-indigo-400">
               <UserCheck className="h-5 w-5" />
             </span>

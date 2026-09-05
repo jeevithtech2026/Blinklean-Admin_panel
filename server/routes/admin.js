@@ -23,13 +23,41 @@ router.get('/dashboard-summary', async (req, res) => {
       dynamoDB.send(new ScanCommand({ TableName: 'Services' }))
     ]);
 
-    // Filter out anonymous/incomplete user registrations from the count
-    const completedUsers = (custResult.Items || []).filter(user => 
-      user.profileComplete === true || 
-      (user.email && user.email.trim() !== '') || 
-      (user.name && user.name.trim() !== '') || 
-      (user.phone && user.phone.trim() !== '')
-    );
+    // Filter only fully completed customer profiles (name, valid phone number, and physical address)
+    const userMap = new Map();
+    for (const u of (custResult.Items || [])) {
+      const id = u.userId || u.id;
+      if (id) userMap.set(id, { ...u, phone: u.phone || u.phoneNumber || '' });
+    }
+    for (const b of (bookingsResult.Items || [])) {
+      const p = b.customerPhone || b.phone || '';
+      const n = b.customerName || b.name || '';
+      const a = b.address || b.fullAddress || '';
+      if (p && n && a) {
+        const clean = p.replace(/[^0-9]/g, '').slice(-10);
+        if (clean.length >= 10) {
+          userMap.set(`cust_${clean}`, { name: n, phone: p, address: a });
+        }
+      }
+    }
+
+    const completedUsers = Array.from(userMap.values()).filter(user => {
+      const cleanDigits = (user.phone || '').replace(/[^0-9]/g, '');
+      const hasPhone = cleanDigits.length >= 8;
+      const hasRealName = user.name && 
+                          user.name.trim() !== '' && 
+                          !user.name.startsWith('Customer-') && 
+                          !user.name.startsWith('Customer (') &&
+                          !user.name.startsWith('User-') &&
+                          user.name !== 'Anonymous User' &&
+                          user.name !== '—';
+      const hasAddress = user.address && 
+                         user.address !== '—' && 
+                         user.address.trim() !== '' && 
+                         user.address !== 'Location Unknown';
+      return hasPhone && hasRealName && hasAddress;
+    });
+
     customersCount = completedUsers.length;
     partnersCount = partResult.Count || 0;
     
