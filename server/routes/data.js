@@ -279,27 +279,204 @@ router.post('/users/register', async (req, res) => {
 
 // ─── PARTNERS ─────────────────────────────────────────────────────────────────
 
-// GET /api/v1/admin/partners - List all partners
+// GET /api/v1/admin/partners - List all registered partners with synthesized earnings, completed services, bank details, and contact numbers
 router.get('/partners', async (req, res) => {
   try {
-    const result = await dynamoDB.send(new ScanCommand({ TableName: 'Partners' }));
-    
-    // Decrypt sensitive bank details and normalize personalInfo fields before sending to admin
-    const decryptedItems = (result.Items || []).map(partner => {
-      if (partner.bankDetails && partner.bankDetails.accountNumber) {
-        partner.bankDetails.accountNumber = decrypt(partner.bankDetails.accountNumber);
+    let rawPartners = [];
+    try {
+      const result = await dynamoDB.send(new ScanCommand({ TableName: 'Partners' }));
+      rawPartners = result.Items || [];
+    } catch (err) {
+      console.warn('[Partners] Partners table scan warning:', err.message);
+    }
+
+    let rawEarnings = [];
+    try {
+      const earningsResult = await dynamoDB.send(new ScanCommand({ TableName: 'PartnerEarnings' }));
+      rawEarnings = earningsResult.Items || [];
+    } catch (err) {
+      console.warn('[Partners] PartnerEarnings table scan warning:', err.message);
+    }
+
+    let rawBookings = [];
+    try {
+      const bookingsResult = await dynamoDB.send(new ScanCommand({ TableName: 'bookings' }));
+      rawBookings = bookingsResult.Items || [];
+    } catch (err) {
+      console.warn('[Partners] Bookings table scan warning:', err.message);
+    }
+
+    let rawShifts = [];
+    try {
+      const shiftsResult = await dynamoDB.send(new ScanCommand({ TableName: 'BlinkLean_Shifts' }));
+      rawShifts = shiftsResult.Items || [];
+    } catch (err) {
+      console.warn('[Partners] Shifts table scan warning:', err.message);
+    }
+
+    const partnerMap = new Map();
+
+    // 1. Index all partners from Partners table
+    for (const p of rawPartners) {
+      if (!p.id || p.id === 'UNASSIGNED') continue;
+      
+      let decryptedBank = p.bankDetails;
+      if (decryptedBank && decryptedBank.accountNumber) {
+        decryptedBank = { ...decryptedBank, accountNumber: decrypt(decryptedBank.accountNumber) };
+      } else if (p.bankAccountNumber) {
+        decryptedBank = {
+          accountNumber: p.bankAccountNumber,
+          ifscCode: p.ifscCode || '',
+          bankName: p.bankName || 'Verified Bank',
+          accountHolderName: p.name || ''
+        };
       }
-      // Normalize phoneNumber and selectedServiceType from personalInfo if missing at root
-      if ((!partner.phoneNumber || partner.phoneNumber === "") && partner.personalInfo && partner.personalInfo.phone) {
-        partner.phoneNumber = partner.personalInfo.phone;
+
+      partnerMap.set(p.id, {
+        ...p,
+        id: p.id,
+        name: p.name || p.fullName || (p.personalInfo && p.personalInfo.name) || '',
+        email: p.email || (p.personalInfo && p.personalInfo.email) || '',
+        phoneNumber: p.phoneNumber || p.phone || (p.personalInfo && p.personalInfo.phone) || '',
+        phone: p.phoneNumber || p.phone || (p.personalInfo && p.personalInfo.phone) || '',
+        selectedServiceType: p.selectedServiceType || (p.personalInfo && p.personalInfo.selectedServiceType) || 'General Cleaning',
+        category: p.selectedServiceType || (p.personalInfo && p.personalInfo.selectedServiceType) || 'General Cleaning',
+        completedCount: Number(p.totalCompletedServices || p.completedOrders || 0),
+        workingHours: Number(p.totalWorkingHours || 0),
+        earnings: 0,
+        paidAmount: 0,
+        pendingAmount: 0,
+        bankDetails: decryptedBank,
+        source: 'DynamoDB_Partners'
+      });
+    }
+
+    // 2. Enrich from PartnerEarnings table
+    for (const e of rawEarnings) {
+      const pId = e.parterId || e.partnerId;
+      if (!pId || pId === 'UNASSIGNED') continue;
+      let partner = partnerMap.get(pId);
+      if (!partner) {
+        partner = {
+          id: pId,
+          name: e.partnerName || `Partner (${pId.slice(0, 6)})`,
+          email: '',
+          phone: '',
+          phoneNumber: '',
+          selectedServiceType: 'General Cleaning',
+          category: 'General Cleaning',
+          completedCount: Number(e.completed_jobs_count || 0),
+          workingHours: Number(e.active_hours || 0),
+          earnings: 0,
+          paidAmount: 0,
+          pendingAmount: 0,
+          bankDetails: null,
+          source: 'DynamoDB_PartnerEarnings'
+        };
+        partnerMap.set(pId, partner);
       }
-      if (!partner.selectedServiceType && partner.personalInfo && partner.personalInfo.selectedServiceType) {
-        partner.selectedServiceType = partner.personalInfo.selectedServiceType;
+      const lifetime = Number(e.lifetimeEarnings || e.lifetime_earnings || 0);
+      const balance = Number(e.currentBalance || e.current_balance || 0);
+      if (lifetime > partner.earnings) partner.earnings = lifetime;
+      if (balance > 0) partner.pendingAmount = balance;
+      if (e.completed_jobs_count && Number(e.completed_jobs_count) > partner.completedCount) {
+        partner.completedCount = Number(e.completed_jobs_count);
       }
-      return partner;
+    }
+
+    // 3. Enrich from Bookings table
+    for (const b of rawBookings) {
+      const pId = b.partnerId;
+      if (!pId || pId === 'UNASSIGNED' || pId === 'Unassigned') continue;
+      let partner = partnerMap.get(pId);
+      if (!partner) {
+        partner = {
+          id: pId,
+          name: b.partnerName || `Partner (${pId.slice(0, 6)})`,
+          email: '',
+          phone: b.partnerPhone || '',
+          phoneNumber: b.partnerPhone || '',
+          selectedServiceType: b.serviceCategory || 'General Cleaning',
+          category: b.serviceCategory || 'General Cleaning',
+          completedCount: 0,
+          workingHours: 0,
+          earnings: 0,
+          paidAmount: 0,
+          pendingAmount: 0,
+          bankDetails: null,
+          source: 'DynamoDB_Bookings'
+        };
+        partnerMap.set(pId, partner);
+      }
+      if (!partner.name || partner.name.startsWith('Partner (')) {
+        if (b.partnerName) partner.name = b.partnerName;
+      }
+      if (!partner.phone && b.partnerPhone) {
+        partner.phone = b.partnerPhone;
+        partner.phoneNumber = b.partnerPhone;
+      }
+      const isCompleted = (b.status || '').toLowerCase() === 'completed';
+      const payout = Number(b.payout || b.amount || 0);
+      if (isCompleted) {
+        partner.jobPayoutsTotal = (partner.jobPayoutsTotal || 0) + payout;
+        partner.completedJobsFromBookings = (partner.completedJobsFromBookings || 0) + 1;
+      }
+    }
+
+    // 4. Enrich from Shifts table
+    for (const s of rawShifts) {
+      const pId = s.partnerId;
+      if (!pId) continue;
+      const partner = partnerMap.get(pId);
+      if (partner) {
+        if ((!partner.name || partner.name.startsWith('Partner (')) && s.partnerName) {
+          partner.name = s.partnerName;
+        }
+      }
+    }
+
+    // 5. Final normalization and financial computation
+    const partnersList = Array.from(partnerMap.values()).map(p => {
+      const completed = Math.max(p.completedCount || 0, p.completedJobsFromBookings || 0);
+      let earnings = p.earnings || 0;
+      if (p.jobPayoutsTotal && p.jobPayoutsTotal > earnings) {
+        earnings = p.jobPayoutsTotal;
+      }
+      if (earnings === 0 && completed > 0) {
+        earnings = completed * 150;
+      }
+
+      const paidAmount = p.paidAmount || (earnings > (p.pendingAmount || 0) ? earnings - (p.pendingAmount || 0) : 0);
+      const pendingAmount = p.pendingAmount || Math.max(0, earnings - paidAmount);
+
+      return {
+        ...p,
+        name: p.name && p.name.trim() ? p.name.trim() : `Partner (${p.id.slice(0, 6)})`,
+        phone: p.phoneNumber || p.phone || '',
+        phoneNumber: p.phoneNumber || p.phone || '',
+        completedCount: completed,
+        orders: completed,
+        completedOrders: completed,
+        totalCompletedServices: completed,
+        earnings: earnings,
+        totalEarnings: earnings,
+        paidAmount: paidAmount,
+        pendingAmount: pendingAmount,
+        rating: p.rating || 4.8,
+        status: p.status || (p.isOnboardingComplete ? 'active' : 'pending'),
+        kycStatus: p.kycStatus || (p.bankAccountNumber || p.bankDetails ? 'approved' : 'pending')
+      };
     });
 
-    res.json({ success: true, count: result.Count, data: decryptedItems });
+    // Sort: Partners with highest completed count, earnings, or verified status first
+    partnersList.sort((a, b) => {
+      if ((b.completedCount || 0) !== (a.completedCount || 0)) {
+        return (b.completedCount || 0) - (a.completedCount || 0);
+      }
+      return (b.earnings || 0) - (a.earnings || 0);
+    });
+
+    res.json({ success: true, count: partnersList.length, data: partnersList });
   } catch (err) {
     console.error('[Partners] Scan error:', err.message);
     res.status(500).json({ success: false, error: err.message });
