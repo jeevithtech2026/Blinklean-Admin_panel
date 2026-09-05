@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { 
   Users, UserCheck, Calendar, CheckCircle2, BarChart3, WifiOff, AlertTriangle, MapPin,
-  ShieldCheck, Settings, Wallet, ListPlus, MessageSquare, Truck, FileText, Database, Gauge, Archive, Lock, Bug, Key, ArrowRight
+  ShieldCheck, Wallet, MessageSquare, ArrowRight
 } from 'lucide-react';
 import KpiCard from '../components/ui/KpiCard';
 import RefreshController from '../components/ui/RefreshController';
@@ -18,16 +18,7 @@ import PartnerTracking from './PartnerTracking';
 import Bookings from './Bookings';
 import VerificationCodes from './VerificationCodes';
 import Payouts from './Payouts';
-import Services from './Services';
 import Feedbacks from './Feedbacks';
-import LogisticsAnalytics from './LogisticsAnalytics';
-import AuditLogs from './AuditLogs';
-import DisasterRecovery from './DisasterRecovery';
-import PerformanceAudit from './PerformanceAudit';
-import DataRetention from './DataRetention';
-import RateLimiting from './RateLimiting';
-import SecurityAudit from './SecurityAudit';
-import WebhookSettings from './WebhookSettings';
 
 const Dashboard = () => {
   const navigate = useNavigate();
@@ -35,8 +26,7 @@ const Dashboard = () => {
   const [isOffline, setIsOffline] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
   const [frequency, setFrequency] = useState(0); // auto-refresh frequency in seconds, 0 = Off
-  const [activeTab, setActiveTab] = useState('overview'); // 'overview' | 'customers' | 'partners' | 'tracking' | 'bookings' | 'verification-codes' | 'more'
-  const [activeMoreTab, setActiveMoreTab] = useState('payouts');
+  const [activeTab, setActiveTab] = useState('overview'); // 'overview' | 'customers' | 'partners' | 'bookings' | 'tracking' | 'verification-codes' | 'payouts' | 'feedbacks'
   
   const [metrics, setMetrics] = useState({
     customers: { title: 'Total Registered Users', value: '0', trend: '', isPositive: true, icon: Users },
@@ -101,20 +91,6 @@ const Dashboard = () => {
       clearInterval(intervalId);
     };
   }, [frequency, fetchDashboardSummary]);
-
-  const moreSubTabs = [
-    { id: 'payouts', name: 'Partner Payouts', icon: Wallet, component: Payouts },
-    { id: 'services', name: 'Service Catalog', icon: ListPlus, component: Services },
-    { id: 'feedbacks', name: 'Customer Feedback', icon: MessageSquare, component: Feedbacks },
-    { id: 'logistics', name: 'Logistics Analytics', icon: Truck, component: LogisticsAnalytics },
-    { id: 'audit-logs', name: 'Audit Logs', icon: FileText, component: AuditLogs },
-    { id: 'disaster-recovery', name: 'Disaster Recovery', icon: Database, component: DisasterRecovery },
-    { id: 'performance', name: 'System Performance', icon: Gauge, component: PerformanceAudit },
-    { id: 'retention', name: 'Data Retention', icon: Archive, component: DataRetention },
-    { id: 'rate-limiting', name: 'Rate Limiting', icon: Lock, component: RateLimiting },
-    { id: 'security-audit', name: 'Dependency Security', icon: Bug, component: SecurityAudit },
-    { id: 'webhooks', name: 'Webhooks & APIs', icon: Key, component: WebhookSettings },
-  ];
 
   const quickNavCards = [
     {
@@ -242,14 +218,24 @@ const Dashboard = () => {
           <ShieldCheck className="h-4 w-4" /> Verification Codes
         </button>
         <button
-          onClick={() => setActiveTab('more')}
+          onClick={() => setActiveTab('payouts')}
           className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold transition-all cursor-pointer ${
-            activeTab === 'more'
+            activeTab === 'payouts'
               ? 'bg-white dark:bg-slate-900 text-slate-900 dark:text-white shadow-xs border border-slate-200 dark:border-slate-700'
               : 'text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-300'
           }`}
         >
-          <Settings className="h-4 w-4" /> More Options
+          <Wallet className="h-4 w-4" /> Partner Payouts
+        </button>
+        <button
+          onClick={() => setActiveTab('feedbacks')}
+          className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold transition-all cursor-pointer ${
+            activeTab === 'feedbacks'
+              ? 'bg-white dark:bg-slate-900 text-slate-900 dark:text-white shadow-xs border border-slate-200 dark:border-slate-700'
+              : 'text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-300'
+          }`}
+        >
+          <MessageSquare className="h-4 w-4" /> Customer Feedback
         </button>
       </div>
 
@@ -360,37 +346,8 @@ const Dashboard = () => {
         {activeTab === 'bookings' && <Bookings />}
         {activeTab === 'verification-codes' && <VerificationCodes />}
         
-        {activeTab === 'more' && (
-          <div className="flex flex-col lg:flex-row gap-6 min-h-[500px]">
-            {/* Inner Sub-sidebar */}
-            <aside className="w-full lg:w-64 shrink-0 flex flex-col bg-white dark:bg-slate-900 border border-slate-200/50 dark:border-slate-800 rounded-2xl p-4 space-y-1 shadow-sm h-max">
-              <span className="text-[10px] font-bold text-slate-400 dark:text-slate-550 uppercase tracking-wider px-3 mb-2 block select-none">Administration Tools</span>
-              {moreSubTabs.map((subTab) => {
-                const isSubActive = activeMoreTab === subTab.id;
-                const Icon = subTab.icon;
-                return (
-                  <button
-                    key={subTab.id}
-                    onClick={() => setActiveMoreTab(subTab.id)}
-                    className={`flex items-center gap-3 px-3 py-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
-                      isSubActive
-                        ? 'bg-violet-600 text-white shadow-sm shadow-violet-200 dark:shadow-none'
-                        : 'text-slate-500 hover:bg-slate-50 dark:hover:bg-slate-800 hover:text-slate-900 dark:hover:text-white'
-                    }`}
-                  >
-                    <Icon className="h-4 w-4 shrink-0" />
-                    {subTab.name}
-                  </button>
-                );
-              })}
-            </aside>
-
-            {/* Inner Content Viewer */}
-            <div className="flex-1 bg-slate-50 dark:bg-slate-950">
-              {React.createElement(moreSubTabs.find(t => t.id === activeMoreTab)?.component || Payouts)}
-            </div>
-          </div>
-        )}
+        {activeTab === 'payouts' && <Payouts />}
+        {activeTab === 'feedbacks' && <Feedbacks />}
       </div>
     </div>
   );

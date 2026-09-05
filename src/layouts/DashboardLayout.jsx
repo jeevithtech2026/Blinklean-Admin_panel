@@ -4,9 +4,8 @@ import { useAuth } from '../context/AuthContext';
 import SystemHealthBanner from '../components/SystemHealthBanner';
 import SettingsPanel from '../components/SettingsPanel';
 import { 
-  LayoutDashboard, Users, UserCheck, Calendar, MapPin, ListPlus, Tag, MessageSquare, 
-  DollarSign, Wallet, ShieldCheck, Truck, FileText, Gauge, Database, Archive, 
-  Lock, Bug, Key, LogOut, Menu, X, Bell, User, Search, ChevronRight
+  LayoutDashboard, Users, UserCheck, Calendar, MapPin, MessageSquare, 
+  Wallet, ShieldCheck, LogOut, Menu, X, Bell, User, Search, ChevronRight
 } from 'lucide-react';
 
 const DashboardLayout = () => {
@@ -17,44 +16,24 @@ const DashboardLayout = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [isSearchFocused, setIsSearchFocused] = useState(false);
 
+  // Clean, focused navigation containing exactly what is needed
   const navSections = [
     {
-      title: 'Core Operations',
+      title: 'Operations & Management',
       items: [
         { name: 'Overview Dashboard', path: '/dashboard', icon: LayoutDashboard },
-        { name: 'Users & Customers', path: '/dashboard/customers', icon: Users, badge: 'Users' },
+        { name: 'User Directory', path: '/dashboard/customers', icon: Users, badge: 'Users' },
         { name: 'Partner Management', path: '/dashboard/partners', icon: UserCheck, badge: 'Partners' },
         { name: 'Service Bookings', path: '/dashboard/bookings', icon: Calendar, badge: 'Bookings' },
-        { name: 'Partner Schedules', path: '/dashboard/tracking', icon: MapPin },
-      ]
-    },
-    {
-      title: 'Services & Growth',
-      items: [
-        { name: 'Service Catalog', path: '/dashboard/services', icon: ListPlus },
-        { name: 'Coupons & Promos', path: '/dashboard/coupons', icon: Tag },
-        { name: 'Customer Feedbacks', path: '/dashboard/feedbacks', icon: MessageSquare },
-      ]
-    },
-    {
-      title: 'Financial Management',
-      items: [
-        { name: 'Financials & Revenue', path: '/dashboard/financials', icon: DollarSign },
-        { name: 'Partner Payouts', path: '/dashboard/payouts', icon: Wallet },
-      ]
-    },
-    {
-      title: 'Operations & Health',
-      items: [
+        { name: 'Partner Schedules & Areas', path: '/dashboard/tracking', icon: MapPin },
         { name: 'Verification Codes', path: '/dashboard/verification-codes', icon: ShieldCheck },
-        { name: 'Logistics Analytics', path: '/dashboard/logistics', icon: Truck },
-        { name: 'Audit Logs', path: '/dashboard/audit-logs', icon: FileText },
-        { name: 'System Performance', path: '/dashboard/performance', icon: Gauge },
-        { name: 'Disaster Recovery', path: '/dashboard/disaster-recovery', icon: Database },
-        { name: 'Data Retention', path: '/dashboard/retention', icon: Archive },
-        { name: 'Rate Limiting', path: '/dashboard/rate-limiting', icon: Lock },
-        { name: 'Security Audit', path: '/dashboard/security-audit', icon: Bug },
-        { name: 'Webhook Settings', path: '/dashboard/webhooks', icon: Key },
+      ]
+    },
+    {
+      title: 'Finance & Reviews',
+      items: [
+        { name: 'Partner Payouts', path: '/dashboard/payouts', icon: Wallet },
+        { name: 'Customer Feedback', path: '/dashboard/feedbacks', icon: MessageSquare },
       ]
     }
   ];
@@ -156,7 +135,7 @@ const DashboardLayout = () => {
             </div>
             <div className="min-w-0 flex-1">
               <p className="text-xs font-bold text-slate-800 dark:text-slate-200 truncate">{adminUser?.username || 'Admin'}</p>
-              <p className="text-[10px] text-slate-400 dark:text-slate-500 font-semibold truncate">{adminUser?.role || 'Super Admin'}</p>
+              <p className="text-[10px] text-slate-400 dark:text-slate-550 font-semibold truncate">{adminUser?.role || 'Super Admin'}</p>
             </div>
           </div>
           <button
@@ -200,7 +179,7 @@ const DashboardLayout = () => {
                 </div>
                 <div className="min-w-0 flex-1">
                   <p className="text-xs font-bold text-slate-800 dark:text-slate-200 truncate">{adminUser?.username || 'Admin'}</p>
-                  <p className="text-[10px] text-slate-400 dark:text-slate-500 font-semibold truncate">{adminUser?.role || 'Super Admin'}</p>
+                  <p className="text-[10px] text-slate-400 dark:text-slate-550 font-semibold truncate">{adminUser?.role || 'Super Admin'}</p>
                 </div>
               </div>
               <button
@@ -232,7 +211,7 @@ const DashboardLayout = () => {
               <Search className="absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 text-slate-400 dark:text-slate-500" />
               <input 
                 type="text" 
-                placeholder="Search users, partners, bookings, operations..." 
+                placeholder="Search users, partners, bookings, schedules..." 
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 onFocus={() => setIsSearchFocused(true)}
@@ -244,7 +223,7 @@ const DashboardLayout = () => {
               {isSearchFocused && searchResults.length > 0 && (
                 <div className="absolute top-full left-0 right-0 mt-2 bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 shadow-xl overflow-hidden z-50">
                   <div className="p-2 border-b border-slate-100 dark:border-slate-800 text-[10px] font-bold text-slate-400 uppercase tracking-wider">
-                    Quick Navigation Matches ({searchResults.length})
+                    Quick Navigation ({searchResults.length})
                   </div>
                   <div className="max-h-60 overflow-y-auto p-1">
                     {searchResults.map((result) => {

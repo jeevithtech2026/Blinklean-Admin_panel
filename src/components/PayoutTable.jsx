@@ -42,6 +42,11 @@ const PayoutTable = ({ partners, onPayoutProcessed }) => {
         valB = (b.earnings || 0) - (b.paidAmount || 0);
       }
 
+      if (sortField === 'completedCount') {
+        valA = a.completedCount ?? a.orders ?? a.completedOrders ?? 0;
+        valB = b.completedCount ?? b.orders ?? b.completedOrders ?? 0;
+      }
+
       valA = valA || 0;
       valB = valB || 0;
 
@@ -115,6 +120,9 @@ const PayoutTable = ({ partners, onPayoutProcessed }) => {
               <tr className="bg-slate-50/75 dark:bg-slate-850/50 border-b border-slate-100 dark:border-slate-800 font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider select-none">
                 <th className={thPadding}>Partner</th>
                 <th className={thPadding}>Bank Details (Secure)</th>
+                <th className={`${thPadding} text-center`} onClick={() => handleSort('completedCount')}>
+                  <div className="flex items-center justify-center gap-1.5 cursor-pointer">Completed Services {renderSortIndicator('completedCount')}</div>
+                </th>
                 <th className={`${thPadding} text-right`} onClick={() => handleSort('earnings')}>
                   <div className="flex items-center justify-end gap-1.5 cursor-pointer">Total Earnings {renderSortIndicator('earnings')}</div>
                 </th>
@@ -135,6 +143,7 @@ const PayoutTable = ({ partners, onPayoutProcessed }) => {
                   const pendingAmount = earnings - paidAmount;
                   const hasBankDetails = partner.bankDetails && partner.bankDetails.accountNumber;
                   const canPay = pendingAmount > 0;
+                  const completedServices = partner.completedCount ?? partner.orders ?? partner.completedOrders ?? 0;
 
                   return (
                     <tr key={partner.id} className="hover:bg-slate-50/50 dark:hover:bg-slate-850/30 transition-colors">
@@ -179,6 +188,13 @@ const PayoutTable = ({ partners, onPayoutProcessed }) => {
                         )}
                       </td>
 
+                      {/* Completed Services Count */}
+                      <td className={`${tdPadding} text-center`}>
+                        <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-bold bg-violet-50 text-violet-700 dark:bg-violet-950/40 dark:text-violet-300 border border-violet-100 dark:border-violet-900/30">
+                          {completedServices} {completedServices === 1 ? 'service' : 'services'}
+                        </span>
+                      </td>
+
                       {/* Earnings */}
                       <td className={`${tdPadding} text-right font-bold text-slate-700 dark:text-slate-300`}>
                         ₹{earnings.toFixed(2)}
@@ -218,7 +234,7 @@ const PayoutTable = ({ partners, onPayoutProcessed }) => {
                 })
               ) : (
                 <tr>
-                  <td colSpan="6" className="px-6 py-12 text-center text-slate-400 dark:text-slate-500">
+                  <td colSpan="7" className="px-6 py-12 text-center text-slate-400 dark:text-slate-500">
                     <div className="flex flex-col items-center gap-3">
                       <ShieldAlert className="h-9 w-9 text-slate-300 dark:text-slate-700" />
                       <h4 className="text-sm font-bold text-slate-800 dark:text-slate-300">No records found</h4>
