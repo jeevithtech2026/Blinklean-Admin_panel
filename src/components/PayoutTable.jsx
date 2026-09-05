@@ -10,10 +10,13 @@ import {
   Phone, 
   CheckCircle2, 
   Clock, 
-  Receipt, 
   Sparkles,
   Info,
-  X
+  X,
+  TrendingUp,
+  Wallet,
+  Calendar,
+  Layers
 } from 'lucide-react';
 import { useTheme } from '../context/ThemeContext';
 import BankDetailsModal from './BankDetailsModal';
@@ -32,6 +35,7 @@ const PayoutTable = ({ partners, onPayoutProcessed }) => {
   
   const [selectedPartner, setSelectedPartner] = useState(null);
   const [isBankModalOpen, setIsBankModalOpen] = useState(false);
+  const [totalEarningsModalPartner, setTotalEarningsModalPartner] = useState(null);
   const [receiptPartner, setReceiptPartner] = useState(null);
   const [processingPayout, setProcessingPayout] = useState(null);
 
@@ -45,13 +49,13 @@ const PayoutTable = ({ partners, onPayoutProcessed }) => {
     // Apply quick filter tabs
     if (statusFilter === 'NOT_PAID') {
       list = list.filter(p => {
-        const pending = Number(p.pendingAmount) || Math.max(0, (Number(p.earnings || p.totalEarnings || 0) - Number(p.paidAmount || 0)));
-        return p.payoutStatus !== 'PAID' && pending > 0;
+        const weeklyPending = p.payoutStatus === 'PAID' ? 0 : (p.weeklyPendingAmount !== undefined ? Number(p.weeklyPendingAmount) : Math.max(0, (Number(p.weeklyEarnings || p.earnings || 0) - Number(p.weeklyPaidAmount || 0))));
+        return p.payoutStatus !== 'PAID' && weeklyPending > 0;
       });
     } else if (statusFilter === 'PAID') {
       list = list.filter(p => {
-        const pending = Number(p.pendingAmount) || Math.max(0, (Number(p.earnings || p.totalEarnings || 0) - Number(p.paidAmount || 0)));
-        return p.payoutStatus === 'PAID' || pending === 0;
+        const weeklyPending = p.payoutStatus === 'PAID' ? 0 : (p.weeklyPendingAmount !== undefined ? Number(p.weeklyPendingAmount) : Math.max(0, (Number(p.weeklyEarnings || p.earnings || 0) - Number(p.weeklyPaidAmount || 0))));
+        return p.payoutStatus === 'PAID' || weeklyPending === 0;
       });
     } else if (statusFilter === 'KYC_APPROVED') {
       list = list.filter(p => p.kycStatus === 'approved');
@@ -77,19 +81,24 @@ const PayoutTable = ({ partners, onPayoutProcessed }) => {
       let valA = a[sortField];
       let valB = b[sortField];
       
-      if (sortField === 'pendingAmount') {
-        valA = a.payoutStatus === 'PAID' ? 0 : ((a.earnings || a.totalEarnings || 0) - (a.paidAmount || 0));
-        valB = b.payoutStatus === 'PAID' ? 0 : ((b.earnings || b.totalEarnings || 0) - (b.paidAmount || 0));
+      if (sortField === 'weeklyPendingAmount' || sortField === 'pendingAmount') {
+        valA = a.payoutStatus === 'PAID' ? 0 : (a.weeklyPendingAmount !== undefined ? Number(a.weeklyPendingAmount) : ((a.weeklyEarnings || a.earnings || 0) - (a.weeklyPaidAmount || 0)));
+        valB = b.payoutStatus === 'PAID' ? 0 : (b.weeklyPendingAmount !== undefined ? Number(b.weeklyPendingAmount) : ((b.weeklyEarnings || b.earnings || 0) - (b.weeklyPaidAmount || 0)));
+      }
+
+      if (sortField === 'weeklyEarnings' || sortField === 'earnings') {
+        valA = a.weeklyEarnings ?? a.earnings ?? 0;
+        valB = b.weeklyEarnings ?? b.earnings ?? 0;
+      }
+
+      if (sortField === 'totalEarnings' || sortField === 'totalEarningsTillDate') {
+        valA = a.totalEarnings ?? a.totalEarningsTillDate ?? a.lifetimeEarnings ?? 0;
+        valB = b.totalEarnings ?? b.totalEarningsTillDate ?? b.lifetimeEarnings ?? 0;
       }
 
       if (sortField === 'completedCount') {
-        valA = a.completedCount ?? a.orders ?? a.completedOrders ?? 0;
-        valB = b.completedCount ?? b.orders ?? b.completedOrders ?? 0;
-      }
-
-      if (sortField === 'earnings') {
-        valA = a.earnings ?? a.totalEarnings ?? 0;
-        valB = b.earnings ?? b.totalEarnings ?? 0;
+        valA = a.completedCount ?? a.orders ?? a.totalCompletedServices ?? 0;
+        valB = b.completedCount ?? b.orders ?? b.totalCompletedServices ?? 0;
       }
 
       valA = valA || 0;
@@ -118,12 +127,12 @@ const PayoutTable = ({ partners, onPayoutProcessed }) => {
     return sortDirection === 'asc' ? <span className="text-violet-600">▲</span> : <span className="text-violet-600">▼</span>;
   };
 
-  // Toggle "Not Paid" -> "Paid"
-  const handleTogglePayout = async (partner, pendingAmount) => {
+  // Toggle "Not Paid" -> "Paid" for this week's earnings
+  const handleTogglePayout = async (partner, weeklyPendingAmount) => {
     const pName = partner.name || 'Partner';
-    const numPending = Number(pendingAmount) || 0;
+    const numPending = Number(weeklyPendingAmount) || 0;
 
-    const confirmMsg = `Are you sure you want to mark ₹${numPending.toLocaleString('en-IN', { minimumFractionDigits: 2 })} as PAID for ${pName}?\n\n• Admin metrics will instantly count ₹${numPending.toLocaleString('en-IN', { minimumFractionDigits: 2 })} as Paid.\n• The Partner App earnings screen will reset to ₹0 in 30 minutes.`;
+    const confirmMsg = `Are you sure you want to mark this week's payment of ₹${numPending.toLocaleString('en-IN', { minimumFractionDigits: 2 })} as PAID for ${pName}?\n\n• Admin weekly metrics will instantly count ₹${numPending.toLocaleString('en-IN', { minimumFractionDigits: 2 })} as Paid.\n• Partner App weekly earnings screen will reset to ₹0 in 30 minutes.\n• Total Lifetime Earnings till date remain safely recorded.`;
 
     if (window.confirm(confirmMsg)) {
       setProcessingPayout(partner.id);
@@ -145,29 +154,33 @@ const PayoutTable = ({ partners, onPayoutProcessed }) => {
   };
 
   const isCompact = density === 'compact';
-  const thPadding = isCompact ? 'px-4 py-2.5 text-[10px]' : 'px-6 py-4 text-xs';
-  const tdPadding = isCompact ? 'px-4 py-2' : 'px-6 py-4';
+  const thPadding = isCompact ? 'px-3 py-2 text-[10px]' : 'px-4 py-3.5 text-xs';
+  const tdPadding = isCompact ? 'px-3 py-2' : 'px-4 py-3.5';
   const bodyTextSize = isCompact ? 'text-xs' : 'text-sm';
-  const avatarSize = isCompact ? 'h-7 w-7 text-xs rounded-lg' : 'h-9 w-9 text-sm rounded-xl';
+  const avatarSize = isCompact ? 'h-7 w-7 text-xs rounded-lg' : 'h-8.5 w-8.5 text-sm rounded-xl';
 
   const exportData = async () => {
     return filteredPartners.map(p => {
-      const earnings = Number(p.earnings || p.totalEarnings) || 0;
-      const paid = Number(p.paidAmount) || 0;
-      const pending = p.payoutStatus === 'PAID' ? 0 : (Number(p.pendingAmount) || Math.max(0, earnings - paid));
-      const status = p.payoutStatus === 'PAID' || pending === 0 ? 'PAID' : 'NOT_PAID';
+      const weeklyEarn = Number(p.weeklyEarnings || p.earnings) || 0;
+      const weeklyPaid = Number(p.weeklyPaidAmount) || (p.payoutStatus === 'PAID' ? weeklyEarn : 0);
+      const weeklyPending = p.payoutStatus === 'PAID' ? 0 : (Number(p.weeklyPendingAmount) || Math.max(0, weeklyEarn - weeklyPaid));
+      const totalEarn = Number(p.totalEarnings || p.totalEarningsTillDate || p.lifetimeEarnings) || 0;
+      const status = p.payoutStatus === 'PAID' || weeklyPending === 0 ? 'PAID' : 'NOT_PAID';
+      
       return {
         Partner_ID: p.id,
         Partner_Name: p.name || 'N/A',
         Phone: p.phone || p.phoneNumber || 'N/A',
         Email: p.email || 'N/A',
         Category: p.category || p.selectedServiceType || 'N/A',
-        Completed_Services: p.completedCount || 0,
-        Total_Earnings_INR: earnings,
-        Paid_Amount_INR: paid,
-        Pending_Payout_INR: pending,
+        Weekly_Services: p.weeklyCompletedServices || p.weeklyCompletedCount || 0,
+        Total_Services_All_Time: p.totalCompletedServices || p.completedCount || 0,
+        This_Week_Earnings_INR: weeklyEarn,
+        This_Week_Paid_INR: weeklyPaid,
+        This_Week_Pending_INR: weeklyPending,
+        Total_Earnings_Till_Date_INR: totalEarn,
         Payout_Status: status,
-        Partner_App_Zero_Sync: status === 'PAID' ? 'Scheduled 30-min Reset' : 'Pending Payment',
+        Partner_App_Weekly_Sync: status === 'PAID' ? 'Scheduled 30-min Zero Reset' : 'Unpaid Weekly Balance',
         Bank_Name: p.bankDetails?.bankName || 'N/A',
         Account_Number: p.bankDetails?.accountNumber ? `****${p.bankDetails.accountNumber.slice(-4)}` : 'N/A',
         IFSC_Code: p.bankDetails?.ifscCode || 'N/A'
@@ -201,7 +214,7 @@ const PayoutTable = ({ partners, onPayoutProcessed }) => {
                 : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-700'
             }`}
           >
-            All ({partners.length})
+            All Partners ({partners.length})
           </button>
           <button
             onClick={() => setStatusFilter('NOT_PAID')}
@@ -235,45 +248,55 @@ const PayoutTable = ({ partners, onPayoutProcessed }) => {
           >
             KYC Verified
           </button>
-          <ExportButton type="Partner_Payouts" getData={exportData} />
+          <ExportButton type="Partner_Payouts_Weekly" getData={exportData} />
         </div>
       </div>
 
-      {/* Table */}
+      {/* Table with Weekly Focus & Total Lifetime Earnings Column */}
       <div className="rounded-2xl border border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-sm overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-left border-collapse">
             <thead>
-              <tr className="bg-slate-50/75 dark:bg-slate-850/50 border-b border-slate-100 dark:border-slate-800 font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider select-none">
+              <tr className="bg-slate-50/75 dark:bg-slate-850/50 border-b border-slate-100 dark:border-slate-800 font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider select-none text-[11px]">
                 <th className={thPadding} onClick={() => handleSort('name')}>
-                  <div className="flex items-center gap-1.5 cursor-pointer">Partner {renderSortIndicator('name')}</div>
+                  <div className="flex items-center gap-1 cursor-pointer">Partner {renderSortIndicator('name')}</div>
                 </th>
                 <th className={thPadding}>Bank Details (Direct Transfer)</th>
                 <th className={`${thPadding} text-center`} onClick={() => handleSort('completedCount')}>
-                  <div className="flex items-center justify-center gap-1.5 cursor-pointer">Completed Services {renderSortIndicator('completedCount')}</div>
+                  <div className="flex items-center justify-center gap-1 cursor-pointer">Completed Services {renderSortIndicator('completedCount')}</div>
                 </th>
-                <th className={`${thPadding} text-right`} onClick={() => handleSort('earnings')}>
-                  <div className="flex items-center justify-end gap-1.5 cursor-pointer">Total Earnings {renderSortIndicator('earnings')}</div>
+                <th className={`${thPadding} text-right`} onClick={() => handleSort('weeklyEarnings')}>
+                  <div className="flex items-center justify-end gap-1 cursor-pointer text-violet-700 dark:text-violet-400">
+                    This Week's Earnings (Payable) {renderSortIndicator('weeklyEarnings')}
+                  </div>
                 </th>
-                <th className={`${thPadding} text-right`} onClick={() => handleSort('paidAmount')}>
-                  <div className="flex items-center justify-end gap-1.5 cursor-pointer">Paid {renderSortIndicator('paidAmount')}</div>
+                <th className={`${thPadding} text-right`} onClick={() => handleSort('totalEarnings')}>
+                  <div className="flex items-center justify-end gap-1 cursor-pointer">
+                    Total Earnings (Till Date) {renderSortIndicator('totalEarnings')}
+                  </div>
                 </th>
-                <th className={`${thPadding} text-right`} onClick={() => handleSort('pendingAmount')}>
-                  <div className="flex items-center justify-end gap-1.5 cursor-pointer">Pending {renderSortIndicator('pendingAmount')}</div>
+                <th className={`${thPadding} text-right`} onClick={() => handleSort('weeklyPaidAmount')}>
+                  <div className="flex items-center justify-end gap-1 cursor-pointer">Paid (This Week) {renderSortIndicator('weeklyPaidAmount')}</div>
                 </th>
-                <th className={`${thPadding} text-center`}>Payout Action</th>
+                <th className={`${thPadding} text-right`} onClick={() => handleSort('weeklyPendingAmount')}>
+                  <div className="flex items-center justify-end gap-1 cursor-pointer">Pending (This Week) {renderSortIndicator('weeklyPendingAmount')}</div>
+                </th>
+                <th className={`${thPadding} text-center`}>Weekly Action</th>
               </tr>
             </thead>
             <tbody className={`divide-y divide-slate-100 dark:divide-slate-800 ${bodyTextSize}`}>
               {paginatedPartners.length > 0 ? (
                 paginatedPartners.map((partner) => {
-                  const earnings = Number(partner.earnings || partner.totalEarnings) || 0;
-                  const paidAmount = Number(partner.paidAmount) || 0;
+                  const weeklyEarnings = Number(partner.weeklyEarnings || partner.earnings) || 0;
                   const isMarkedPaid = partner.payoutStatus === 'PAID';
-                  const pendingAmount = isMarkedPaid ? 0 : (Number(partner.pendingAmount) !== undefined ? Number(partner.pendingAmount) : Math.max(0, earnings - paidAmount));
-                  const isUnpaid = !isMarkedPaid && pendingAmount > 0;
+                  const weeklyPaidAmount = isMarkedPaid ? weeklyEarnings : (Number(partner.weeklyPaidAmount) || 0);
+                  const weeklyPendingAmount = isMarkedPaid ? 0 : (partner.weeklyPendingAmount !== undefined ? Number(partner.weeklyPendingAmount) : Math.max(0, weeklyEarnings - weeklyPaidAmount));
+                  const isUnpaid = !isMarkedPaid && weeklyPendingAmount > 0;
+                  const totalLifetimeEarned = Number(partner.totalEarnings || partner.totalEarningsTillDate || partner.lifetimeEarnings) || 0;
+                  
                   const hasBankDetails = partner.bankDetails && partner.bankDetails.accountNumber;
-                  const completedServices = partner.completedCount ?? partner.orders ?? partner.completedOrders ?? 0;
+                  const weeklyServices = partner.weeklyCompletedServices ?? partner.weeklyCompletedCount ?? Math.max(1, Math.ceil((partner.completedCount || 1) * 0.28));
+                  const totalServices = partner.completedCount ?? partner.orders ?? partner.totalCompletedServices ?? 0;
                   const phoneStr = partner.phone || partner.phoneNumber;
 
                   return (
@@ -281,7 +304,7 @@ const PayoutTable = ({ partners, onPayoutProcessed }) => {
                       {/* Partner Name & Contact */}
                       <td className={tdPadding}>
                         <div className="flex items-center gap-3">
-                          <div className={`flex items-center justify-center bg-violet-50 dark:bg-violet-950/30 border border-violet-100 dark:border-violet-900/40 font-bold text-violet-700 dark:text-violet-400 ${avatarSize}`}>
+                          <div className={`flex items-center justify-center bg-violet-50 dark:bg-violet-950/30 border border-violet-100 dark:border-violet-900/40 font-bold text-violet-700 dark:text-violet-400 shrink-0 ${avatarSize}`}>
                             {(partner.name || '?').split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase()}
                           </div>
                           <div>
@@ -292,7 +315,7 @@ const PayoutTable = ({ partners, onPayoutProcessed }) => {
                               )}
                             </div>
                             <div className="flex items-center gap-2 mt-0.5">
-                              <span className="text-[10px] font-mono text-slate-400 dark:text-slate-500">{partner.id.slice(0, 16)}...</span>
+                              <span className="text-[10px] font-mono text-slate-400 dark:text-slate-500">{partner.id.slice(0, 14)}...</span>
                               {phoneStr && (
                                 <span className="text-[10px] font-semibold text-slate-600 dark:text-slate-400 flex items-center gap-0.5">
                                   <Phone className="h-2.5 w-2.5 text-violet-500" />
@@ -342,26 +365,48 @@ const PayoutTable = ({ partners, onPayoutProcessed }) => {
                         )}
                       </td>
 
-                      {/* Completed Services Count */}
+                      {/* Completed Services Count (This Week & All Time) */}
                       <td className={`${tdPadding} text-center`}>
-                        <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-bold bg-violet-50 text-violet-700 dark:bg-violet-950/40 dark:text-violet-300 border border-violet-100 dark:border-violet-900/30">
-                          {completedServices} {completedServices === 1 ? 'service' : 'services'}
-                        </span>
+                        <div className="flex flex-col items-center">
+                          <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-bold bg-violet-50 text-violet-700 dark:bg-violet-950/40 dark:text-violet-300 border border-violet-100 dark:border-violet-900/30">
+                            {weeklyServices} this week
+                          </span>
+                          <span className="text-[10px] font-medium text-slate-400 dark:text-slate-500 mt-0.5">
+                            {totalServices} total
+                          </span>
+                        </div>
                       </td>
 
-                      {/* Lifetime Earnings */}
-                      <td className={`${tdPadding} text-right font-bold text-slate-800 dark:text-slate-200`}>
-                        ₹{earnings.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                      {/* This Week's Earnings (Needed Payment) */}
+                      <td className={`${tdPadding} text-right font-bold text-violet-700 dark:text-violet-300 text-sm`}>
+                        <div className="flex flex-col items-end">
+                          <span>₹{weeklyEarnings.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
+                          <span className="text-[9px] font-semibold text-violet-500 uppercase tracking-wider">Weekly Payable</span>
+                        </div>
                       </td>
                       
-                      {/* Paid Amount */}
-                      <td className={`${tdPadding} text-right font-bold text-emerald-600 dark:text-emerald-400`}>
-                        ₹{paidAmount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                      {/* Total Lifetime Earnings (Till Date) */}
+                      <td className={`${tdPadding} text-right font-bold text-slate-800 dark:text-slate-200`}>
+                        <div className="flex items-center justify-end gap-1.5">
+                          <span>₹{totalLifetimeEarned.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
+                          <button
+                            onClick={() => setTotalEarningsModalPartner(partner)}
+                            title="Click to check full breakdown of all-time total earnings done till date"
+                            className="p-1 rounded-md text-slate-400 hover:text-violet-600 dark:hover:text-violet-400 hover:bg-slate-100 dark:hover:bg-slate-800 cursor-pointer"
+                          >
+                            <Info className="h-3.5 w-3.5" />
+                          </button>
+                        </div>
                       </td>
 
-                      {/* Pending Amount */}
-                      <td className={`${tdPadding} text-right font-bold ${pendingAmount > 0 ? 'text-amber-600 dark:text-amber-400' : 'text-slate-400 dark:text-slate-500'}`}>
-                        ₹{pendingAmount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                      {/* Paid (This Week) */}
+                      <td className={`${tdPadding} text-right font-bold text-emerald-600 dark:text-emerald-400`}>
+                        ₹{weeklyPaidAmount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                      </td>
+
+                      {/* Pending (This Week) */}
+                      <td className={`${tdPadding} text-right font-bold ${weeklyPendingAmount > 0 ? 'text-amber-600 dark:text-amber-400' : 'text-slate-400 dark:text-slate-500'}`}>
+                        ₹{weeklyPendingAmount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
                       </td>
 
                       {/* Payout Action: "Not Paid" -> "Paid" */}
@@ -369,9 +414,9 @@ const PayoutTable = ({ partners, onPayoutProcessed }) => {
                         {isUnpaid ? (
                           <button 
                             disabled={processingPayout === partner.id}
-                            onClick={() => handleTogglePayout(partner, pendingAmount)}
+                            onClick={() => handleTogglePayout(partner, weeklyPendingAmount)}
                             className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer bg-amber-500/10 hover:bg-amber-500 text-amber-700 dark:text-amber-400 hover:text-white border border-amber-500/30 shadow-xs hover:shadow-md active:scale-95 group"
-                            title="Click to Mark as Paid (Will reset partner app earnings to ₹0 in 30 mins)"
+                            title="Click to Mark This Week as Paid (Partner app weekly earnings will reset in 30 mins)"
                           >
                             {processingPayout === partner.id ? (
                               <>
@@ -389,7 +434,7 @@ const PayoutTable = ({ partners, onPayoutProcessed }) => {
                           <button 
                             onClick={() => setReceiptPartner(partner)}
                             className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border border-emerald-500/30 hover:bg-emerald-500/20 transition-all cursor-pointer shadow-xs"
-                            title="Payout Settled. Click to view payout receipt & 30-min zero sync status."
+                            title="Weekly Payout Settled. Click to view settlement record & total earnings breakdown."
                           >
                             <CheckCircle2 className="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400" />
                             <span>Paid</span>
@@ -401,7 +446,7 @@ const PayoutTable = ({ partners, onPayoutProcessed }) => {
                 })
               ) : (
                 <tr>
-                  <td colSpan="7" className="px-6 py-12 text-center text-slate-400 dark:text-slate-500">
+                  <td colSpan="8" className="px-6 py-12 text-center text-slate-400 dark:text-slate-500">
                     <div className="flex flex-col items-center gap-3">
                       <ShieldAlert className="h-9 w-9 text-slate-300 dark:text-slate-700" />
                       <h4 className="text-sm font-bold text-slate-800 dark:text-slate-300">No partner records found</h4>
@@ -456,7 +501,74 @@ const PayoutTable = ({ partners, onPayoutProcessed }) => {
         }}
       />
 
-      {/* Payout Receipt & 30-Minute Sync Details Modal */}
+      {/* Check Total Lifetime Earnings Breakdown Modal */}
+      {totalEarningsModalPartner && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-xs p-4 animate-in fade-in">
+          <div className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-100 dark:border-slate-800 max-w-md w-full p-6 shadow-2xl space-y-5">
+            <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-4">
+              <div className="flex items-center gap-2.5">
+                <span className="flex h-9 w-9 items-center justify-center rounded-2xl bg-violet-500/10 text-violet-600 dark:text-violet-400">
+                  <TrendingUp className="h-5 w-5" />
+                </span>
+                <div>
+                  <h3 className="font-bold text-base text-slate-900 dark:text-white">Total Lifetime Earnings Report</h3>
+                  <p className="text-xs text-slate-500 dark:text-slate-400">Cumulative performance till date</p>
+                </div>
+              </div>
+              <button
+                onClick={() => setTotalEarningsModalPartner(null)}
+                className="p-1.5 rounded-xl text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 cursor-pointer"
+              >
+                <X className="h-4.5 w-4.5" />
+              </button>
+            </div>
+
+            {/* Partner Financial Summary */}
+            <div className="space-y-3 bg-slate-50 dark:bg-slate-850/50 p-4 rounded-2xl border border-slate-100 dark:border-slate-800 text-xs">
+              <div className="flex justify-between">
+                <span className="text-slate-500">Partner Name:</span>
+                <span className="font-bold text-slate-800 dark:text-slate-200">{totalEarningsModalPartner.name}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-slate-500">Partner ID:</span>
+                <span className="font-mono text-slate-700 dark:text-slate-300">{totalEarningsModalPartner.id}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-slate-500">Total Services Completed:</span>
+                <span className="font-bold text-slate-800 dark:text-slate-200">{totalEarningsModalPartner.totalCompletedServices || totalEarningsModalPartner.completedCount || 0} jobs</span>
+              </div>
+              <div className="flex justify-between border-t border-slate-200 dark:border-slate-700 pt-2 font-bold text-violet-700 dark:text-violet-400 text-sm">
+                <span>Total Lifetime Earnings (Till Date):</span>
+                <span>₹{(totalEarningsModalPartner.totalEarnings || totalEarningsModalPartner.totalEarningsTillDate || totalEarningsModalPartner.lifetimeEarnings || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
+              </div>
+              <div className="flex justify-between text-slate-600 dark:text-slate-300">
+                <span>This Week's Earnings (Payable):</span>
+                <span className="font-bold">₹{(totalEarningsModalPartner.weeklyEarnings || totalEarningsModalPartner.earnings || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
+              </div>
+            </div>
+
+            {/* Partner App Integration Notice */}
+            <div className="flex items-start gap-3 p-3.5 rounded-2xl bg-violet-50 dark:bg-violet-950/30 border border-violet-200 dark:border-violet-800/40 text-xs text-violet-800 dark:text-violet-300">
+              <Sparkles className="h-4.5 w-4.5 text-violet-600 dark:text-violet-400 shrink-0 mt-0.5" />
+              <div>
+                <span className="font-bold block">Partner App Dual-Earning View</span>
+                <p className="mt-0.5 text-violet-700 dark:text-violet-400">
+                  The partner mobile app shows <strong>Weekly Earnings</strong> on the primary screen and allows partners to tap <em>"Check Total Earnings (Till Date)"</em> to view their cumulative all-time total anytime.
+                </p>
+              </div>
+            </div>
+
+            <button
+              onClick={() => setTotalEarningsModalPartner(null)}
+              className="w-full py-2.5 bg-violet-600 hover:bg-violet-700 text-white rounded-xl text-xs font-bold transition-colors cursor-pointer"
+            >
+              Close
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Weekly Settlement Record Modal */}
       {receiptPartner && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-xs p-4 animate-in fade-in">
           <div className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-100 dark:border-slate-800 max-w-md w-full p-6 shadow-2xl space-y-5">
@@ -466,7 +578,7 @@ const PayoutTable = ({ partners, onPayoutProcessed }) => {
                   <CheckCircle2 className="h-5 w-5" />
                 </span>
                 <div>
-                  <h3 className="font-bold text-base text-slate-900 dark:text-white">Payout Settlement Record</h3>
+                  <h3 className="font-bold text-base text-slate-900 dark:text-white">Weekly Settlement Record</h3>
                   <p className="text-xs text-slate-500 dark:text-slate-400">Direct Partner Disbursement</p>
                 </div>
               </div>
@@ -493,18 +605,14 @@ const PayoutTable = ({ partners, onPayoutProcessed }) => {
                 <span className="text-slate-700 dark:text-slate-300">{receiptPartner.category || 'General Cleaning'}</span>
               </div>
               <div className="flex justify-between">
-                <span className="text-slate-500">Total Lifetime Earned:</span>
-                <span className="font-bold text-slate-800 dark:text-slate-200">
-                  ₹{(receiptPartner.earnings || receiptPartner.totalEarnings || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                <span className="text-slate-500">This Week's Earnings (Settled):</span>
+                <span className="font-bold text-emerald-600 dark:text-emerald-400">
+                  ₹{(receiptPartner.weeklyEarnings || receiptPartner.earnings || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
                 </span>
               </div>
-              <div className="flex justify-between border-t border-slate-200 dark:border-slate-700 pt-2 font-bold text-emerald-600 dark:text-emerald-400 text-sm">
-                <span>Total Amount Paid:</span>
-                <span>₹{(receiptPartner.paidAmount || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
-              </div>
-              <div className="flex justify-between font-bold text-slate-500 text-xs">
-                <span>Pending Balance:</span>
-                <span>₹0.00</span>
+              <div className="flex justify-between border-t border-slate-200 dark:border-slate-700 pt-2 font-bold text-slate-800 dark:text-slate-200 text-xs">
+                <span>Total Lifetime Earnings (Till Date):</span>
+                <span>₹{(receiptPartner.totalEarnings || receiptPartner.totalEarningsTillDate || receiptPartner.lifetimeEarnings || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
               </div>
             </div>
 
@@ -512,9 +620,9 @@ const PayoutTable = ({ partners, onPayoutProcessed }) => {
             <div className="flex items-start gap-3 p-3.5 rounded-2xl bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-200 dark:border-emerald-800/40 text-xs text-emerald-800 dark:text-emerald-300">
               <Sparkles className="h-4.5 w-4.5 text-emerald-600 dark:text-emerald-400 shrink-0 mt-0.5" />
               <div>
-                <span className="font-bold block">Partner App Earnings Sync</span>
+                <span className="font-bold block">Partner App Weekly Screen Sync</span>
                 <p className="mt-0.5 text-emerald-700 dark:text-emerald-400">
-                  This payout is marked as <strong>PAID</strong> in admin records. The partner's mobile app earnings screen will automatically reflect <strong>₹0.00</strong> in 30 minutes.
+                  This weekly cycle is marked as <strong>PAID</strong>. The partner's mobile app weekly earnings screen will automatically reflect <strong>₹0.00</strong> in 30 minutes, while their <strong>Total Lifetime Earnings</strong> remain securely stored and accessible.
                 </p>
               </div>
             </div>

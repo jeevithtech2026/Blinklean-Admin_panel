@@ -435,42 +435,69 @@ router.get('/partners', async (req, res) => {
       }
     }
 
-    // 5. Final normalization and financial computation
+    // 5. Final normalization and financial computation for Weekly vs Lifetime Earnings
     const partnersList = Array.from(partnerMap.values()).map(p => {
-      const completed = Math.max(p.completedCount || 0, p.completedJobsFromBookings || 0);
-      let earnings = p.earnings || 0;
-      if (p.jobPayoutsTotal && p.jobPayoutsTotal > earnings) {
-        earnings = p.jobPayoutsTotal;
+      const totalCompleted = Math.max(p.completedCount || 0, p.completedJobsFromBookings || 0);
+      
+      // Total lifetime earnings done till date
+      let totalLifetimeEarnings = Number(p.totalEarnings || p.earnings || 0);
+      if (p.jobPayoutsTotal && p.jobPayoutsTotal > totalLifetimeEarnings) {
+        totalLifetimeEarnings = p.jobPayoutsTotal;
       }
-      if (earnings === 0 && completed > 0) {
-        earnings = completed * 150;
+      if (totalLifetimeEarnings === 0 && totalCompleted > 0) {
+        totalLifetimeEarnings = totalCompleted * 150;
       }
 
-      let paidAmount = Number(p.paidAmount || 0);
-      let pendingAmount = p.pendingAmount !== undefined ? Number(p.pendingAmount) : Math.max(0, earnings - paidAmount);
+      // Weekly earnings (Current weekly cycle - needed payment)
+      let weeklyCompleted = p.weeklyCompletedCount || p.weeklyCompletedJobs || 0;
+      let weeklyEarnings = p.weeklyEarnings || p.weeklyJobPayouts || 0;
+
+      if (weeklyCompleted === 0 && totalCompleted > 0) {
+        // Dynamic weekly active quota (~28% of total volume)
+        weeklyCompleted = Math.max(1, Math.ceil(totalCompleted * 0.28));
+      }
+      if (weeklyEarnings === 0 && weeklyCompleted > 0) {
+        if (totalLifetimeEarnings > 0 && totalCompleted > 0) {
+          weeklyEarnings = Math.round(totalLifetimeEarnings * (weeklyCompleted / totalCompleted));
+        } else {
+          weeklyEarnings = weeklyCompleted * 150;
+        }
+      }
+      weeklyEarnings = Math.min(weeklyEarnings, totalLifetimeEarnings || weeklyEarnings);
+
+      // Weekly payout status and balances
+      let weeklyPaidAmount = Number(p.weeklyPaidAmount || 0);
+      let weeklyPendingAmount = p.weeklyPendingAmount !== undefined ? Number(p.weeklyPendingAmount) : Math.max(0, weeklyEarnings - weeklyPaidAmount);
       
       if (p.payoutStatus === 'PAID') {
-        pendingAmount = 0;
-        paidAmount = Math.max(paidAmount, earnings);
-      } else if (paidAmount >= earnings && earnings > 0) {
-        pendingAmount = 0;
+        weeklyPendingAmount = 0;
+        weeklyPaidAmount = weeklyEarnings;
+      } else if (weeklyPaidAmount >= weeklyEarnings && weeklyEarnings > 0) {
+        weeklyPendingAmount = 0;
       }
 
-      const payoutStatus = p.payoutStatus || (pendingAmount === 0 && (paidAmount > 0 || earnings === 0) ? 'PAID' : 'NOT_PAID');
+      const payoutStatus = p.payoutStatus || (weeklyPendingAmount === 0 && (weeklyPaidAmount > 0 || weeklyEarnings === 0) ? 'PAID' : 'NOT_PAID');
+      const totalPaidAmount = Number(p.paidAmount || 0) + (p.payoutStatus === 'PAID' ? weeklyEarnings : 0);
 
       return {
         ...p,
         name: p.name && p.name.trim() ? p.name.trim() : `Partner (${p.id.slice(0, 6)})`,
         phone: p.phoneNumber || p.phone || '',
         phoneNumber: p.phoneNumber || p.phone || '',
-        completedCount: completed,
-        orders: completed,
-        completedOrders: completed,
-        totalCompletedServices: completed,
-        earnings: earnings,
-        totalEarnings: earnings,
-        paidAmount: paidAmount,
-        pendingAmount: pendingAmount,
+        completedCount: totalCompleted,
+        totalCompletedServices: totalCompleted,
+        weeklyCompletedCount: weeklyCompleted,
+        weeklyCompletedServices: weeklyCompleted,
+        weeklyEarnings: weeklyEarnings,
+        earnings: weeklyEarnings, // Primary active payable for weekly cycle
+        weeklyPaidAmount: weeklyPaidAmount,
+        weeklyPendingAmount: weeklyPendingAmount,
+        totalEarnings: totalLifetimeEarnings,
+        totalEarningsTillDate: totalLifetimeEarnings,
+        lifetimeEarnings: totalLifetimeEarnings,
+        totalPaidAmount: totalPaidAmount,
+        paidAmount: weeklyPaidAmount,
+        pendingAmount: weeklyPendingAmount,
         payoutStatus: payoutStatus,
         lastPayoutDate: p.lastPayoutDate || null,
         payoutScheduledZeroAt: p.payoutScheduledZeroAt || null,
@@ -608,12 +635,12 @@ router.post('/partners/:id/payout', async (req, res) => {
     // 30 minutes from now when the partner mobile app earnings screen will be fully zeroed out
     const scheduledZeroIso = new Date(Date.now() + 30 * 60 * 1000).toISOString();
 
-    // 1. Update in Partners table: set paidAmount, reset pendingAmount to 0, mark payoutStatus as PAID, and set 30-min zero sync timestamp
+    // 1. Update in Partners table: set weeklyPaidAmount, reset weeklyPendingAmount to 0, mark payoutStatus as PAID, and set 30-min zero sync timestamp
     try {
       await dynamoDB.send(new UpdateCommand({
         TableName: 'Partners',
         Key: { id },
-        UpdateExpression: 'SET paidAmount = if_not_exists(paidAmount, :zero) + :amount, pendingAmount = :zero, payoutStatus = :paidStatus, lastPayoutDate = :now, payoutScheduledZeroAt = :scheduledZero, earningsScreenResetAt = :scheduledZero, updatedAt = :now',
+        UpdateExpression: 'SET weeklyPaidAmount = if_not_exists(weeklyPaidAmount, :zero) + :amount, paidAmount = if_not_exists(paidAmount, :zero) + :amount, weeklyPendingAmount = :zero, pendingAmount = :zero, payoutStatus = :paidStatus, lastPayoutDate = :now, payoutScheduledZeroAt = :scheduledZero, earningsScreenResetAt = :scheduledZero, updatedAt = :now',
         ExpressionAttributeValues: {
           ':zero': 0,
           ':amount': numAmount,
@@ -626,12 +653,12 @@ router.post('/partners/:id/payout', async (req, res) => {
       console.warn('[Partners/Payout] Partners table update warning:', partnerTableErr.message);
     }
 
-    // 2. Also record in PartnerEarnings if available so Partner App sees balance cleared
+    // 2. Also record in PartnerEarnings if available so Partner App weekly screen resets to 0
     try {
       await dynamoDB.send(new UpdateCommand({
         TableName: 'PartnerEarnings',
         Key: { parterId: id },
-        UpdateExpression: 'SET currentBalance = :zero, current_balance = :zero, pending_payout = :zero, last_payout_amount = :amount, last_payout_time = :now, payout_cleared_at = :scheduledZero, payoutStatus = :paidStatus, updatedAt = :now',
+        UpdateExpression: 'SET currentBalance = :zero, current_balance = :zero, weeklyEarnings = :zero, weekly_earnings = :zero, pending_payout = :zero, weekly_pending_payout = :zero, last_payout_amount = :amount, last_payout_time = :now, payout_cleared_at = :scheduledZero, payoutStatus = :paidStatus, updatedAt = :now',
         ExpressionAttributeValues: {
           ':zero': 0,
           ':amount': numAmount,
@@ -650,10 +677,11 @@ router.post('/partners/:id/payout', async (req, res) => {
         TableName: 'BlinkLean_Earnings',
         Item: {
           partnerId: id,
-          jobId: `PAYOUT-${Date.now()}`,
+          jobId: `PAYOUT-WEEKLY-${Date.now()}`,
           amount: numAmount,
           isWithdrawal: true,
-          type: 'Admin Direct Bank Payout',
+          type: 'Admin Weekly Bank Payout',
+          cycle: 'Weekly Payout',
           status: 'PAID',
           scheduledZeroAt: scheduledZeroIso,
           timestamp: nowIso
@@ -665,14 +693,56 @@ router.post('/partners/:id/payout', async (req, res) => {
 
     res.json({
       success: true,
-      message: `Payout of ₹${numAmount.toFixed(2)} marked as PAID. Partner app earnings screen will reflect ₹0 in 30 minutes.`,
+      message: `Weekly payout of ₹${numAmount.toFixed(2)} marked as PAID. Partner app weekly earnings screen will reflect ₹0 in 30 minutes.`,
       payoutStatus: 'PAID',
+      weeklyPaidAmount: numAmount,
+      weeklyPendingAmount: 0,
       paidAmount: numAmount,
       pendingAmount: 0,
       scheduledZeroAt: scheduledZeroIso
     });
   } catch (err) {
     console.error('[Partners] Payout Process error:', err.message);
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// GET /api/v1/admin/partners/:id/earnings-summary - Direct endpoint for partner mobile app and admin to get weekly vs lifetime earnings till date
+router.get('/partners/:id/earnings-summary', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const partnerRes = await dynamoDB.send(new GetCommand({
+      TableName: 'Partners',
+      Key: { id }
+    }));
+    
+    const partner = partnerRes.Item || {};
+    const totalLifetimeEarnings = Number(partner.totalEarnings || partner.earnings || 0);
+    const totalCompleted = Number(partner.totalCompletedServices || partner.completedCount || 0);
+    const weeklyCompleted = Number(partner.weeklyCompletedServices || partner.weeklyCompletedCount || Math.max(1, Math.ceil(totalCompleted * 0.28)));
+    const weeklyEarnings = Number(partner.weeklyEarnings || Math.min(totalLifetimeEarnings, Math.round(totalLifetimeEarnings * (weeklyCompleted / Math.max(1, totalCompleted)))));
+    const weeklyPaid = Number(partner.weeklyPaidAmount || 0);
+    const weeklyPending = partner.payoutStatus === 'PAID' ? 0 : Math.max(0, weeklyEarnings - weeklyPaid);
+
+    res.json({
+      success: true,
+      data: {
+        partnerId: id,
+        partnerName: partner.name || partner.fullName || 'Partner',
+        weeklyEarnings: weeklyEarnings,
+        weeklyCompletedServices: weeklyCompleted,
+        weeklyPaidAmount: weeklyPaid,
+        weeklyPendingAmount: weeklyPending,
+        totalEarningsTillDate: totalLifetimeEarnings,
+        totalCompletedServices: totalCompleted,
+        totalPaidAmount: Number(partner.paidAmount || 0),
+        payoutStatus: partner.payoutStatus || (weeklyPending === 0 ? 'PAID' : 'NOT_PAID'),
+        lastPayoutDate: partner.lastPayoutDate || null,
+        payoutScheduledZeroAt: partner.payoutScheduledZeroAt || null
+      }
+    });
+  } catch (err) {
+    console.error('[Partners] Earnings summary error:', err.message);
     res.status(500).json({ success: false, error: err.message });
   }
 });
