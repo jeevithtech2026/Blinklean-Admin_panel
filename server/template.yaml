@@ -56,7 +56,7 @@ Resources:
     Properties:
       CodeUri: ./
       Handler: lambda.handler # Points to lambda.js wrapper executing serverless-express
-      Runtime: nodejs18.x
+      Runtime: nodejs24.x
       Timeout: 15
       MemorySize: 512
       
