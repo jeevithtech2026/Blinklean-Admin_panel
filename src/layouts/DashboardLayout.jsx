@@ -22,7 +22,7 @@ const DashboardLayout = () => {
       title: 'Operations & Management',
       items: [
         { name: 'Overview Dashboard', path: '/dashboard', icon: LayoutDashboard },
-        { name: 'User Directory', path: '/dashboard/customers', icon: Users, badge: 'Users' },
+        { name: 'Users', path: '/dashboard/customers', icon: Users, badge: 'Users' },
         { name: 'Partner Management', path: '/dashboard/partners', icon: UserCheck, badge: 'Partners' },
         { name: 'Service Bookings', path: '/dashboard/bookings', icon: Calendar, badge: 'Bookings' },
         { name: 'Verification Codes', path: '/dashboard/verification-codes', icon: ShieldCheck },

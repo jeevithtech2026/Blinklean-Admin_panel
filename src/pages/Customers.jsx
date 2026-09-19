@@ -43,7 +43,7 @@ const Customers = () => {
       setErrorMsg('');
       setIsOffline(false);
 
-      const response = await axiosInstance.get('/api/v1/data/users');
+      const response = await axiosInstance.get('/api/v1/data/users?all=true');
 
       if (response.data?.data && response.data.data.length > 0) {
         console.log('[Customers] Successfully retrieved users from AWS backend:', response.data);
@@ -97,9 +97,9 @@ const Customers = () => {
       {/* Header section */}
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight text-slate-900 dark:text-white">Customer Directory (Completed Profiles Only)</h1>
+          <h1 className="text-2xl font-bold tracking-tight text-slate-900 dark:text-white">Users List</h1>
           <p className="text-sm text-slate-500 dark:text-slate-400">
-            Displaying only customers with 100% complete details (verified real full name, active contact number, and exact physical address).
+            All registered users from the database — including customers with full profiles and partial registrations.
           </p>
         </div>
 
@@ -137,7 +137,7 @@ const Customers = () => {
         {/* Total Customers */}
         <div className="rounded-2xl border border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-900 p-5 shadow-sm">
           <div className="flex items-center justify-between">
-            <span className="text-xs font-bold uppercase tracking-wider text-slate-400">Complete Customer Profiles</span>
+            <span className="text-xs font-bold uppercase tracking-wider text-slate-400">Total Registered Users</span>
             <span className="rounded-xl bg-blue-50 dark:bg-blue-950/40 p-2.5 text-blue-600 dark:text-blue-400">
               <Users className="h-5 w-5" />
             </span>
