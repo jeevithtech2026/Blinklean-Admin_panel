@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { baseURL } from '../api/axiosInstance';
 
 /**
  * Custom hook to manage real-time Server-Sent Events (SSE) connections with mock fallback routines.
@@ -12,7 +13,7 @@ const useLiveEvents = (maxHistory = 20) => {
     let eventSource = null;
     let fallbackInterval = null;
 
-    const gatewayUrl = import.meta.env.VITE_ADMIN_API_GATEWAY_URL || 'http://localhost:5000';
+    const gatewayUrl = baseURL;
     const sseUrl = `${gatewayUrl}/api/v1/admin/live-activities`;
 
     console.log(`[useLiveEvents] Initializing EventSource link connection: ${sseUrl}`);

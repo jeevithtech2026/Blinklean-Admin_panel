@@ -3,28 +3,39 @@ import { triggerGlobalNotification } from '../context/NotificationContext';
 
 const PROD_API_GATEWAY_URL = 'https://95t7w0g5nd.execute-api.ap-south-1.amazonaws.com/production';
 
-// Safely access environment variables, checking both React (process.env) and Vite (import.meta.env) context
+// Safely access environment variables, ensuring production/deployed sites always use AWS API Gateway
 const getBaseURL = () => {
-  if (typeof process !== 'undefined' && process.env && process.env.REACT_APP_ADMIN_API_GATEWAY_URL) {
-    return process.env.REACT_APP_ADMIN_API_GATEWAY_URL;
+  // If running in browser and hostname is NOT localhost / 127.0.0.1 (e.g. Amplify, Netlify, custom domain)
+  if (typeof window !== 'undefined' && window.location) {
+    const isLocalhost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+    if (!isLocalhost) {
+      const remoteEnvUrl =
+        (import.meta?.env?.VITE_ADMIN_API_GATEWAY_URL) ||
+        (typeof process !== 'undefined' ? process.env?.REACT_APP_ADMIN_API_GATEWAY_URL : null);
+      if (remoteEnvUrl && !remoteEnvUrl.includes('localhost') && !remoteEnvUrl.includes('127.0.0.1')) {
+        return remoteEnvUrl;
+      }
+      return PROD_API_GATEWAY_URL;
+    }
   }
-  if (import.meta && import.meta.env && import.meta.env.VITE_ADMIN_API_GATEWAY_URL) {
+
+  // Local development / fallback
+  if (import.meta?.env?.VITE_ADMIN_API_GATEWAY_URL) {
     return import.meta.env.VITE_ADMIN_API_GATEWAY_URL;
   }
-  // If running in browser and hostname is not localhost/127.0.0.1, use AWS API Gateway
-  if (typeof window !== 'undefined' && window.location && window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1') {
-    return PROD_API_GATEWAY_URL;
+  if (typeof process !== 'undefined' && process.env?.REACT_APP_ADMIN_API_GATEWAY_URL) {
+    return process.env.REACT_APP_ADMIN_API_GATEWAY_URL;
   }
-  return 'http://localhost:5000'; // Local dev fallback
+  return PROD_API_GATEWAY_URL;
 };
 
-const baseURL = getBaseURL();
+export const baseURL = getBaseURL();
 
 console.log(`[API Config] axios base URL initialized to: ${baseURL}`);
 
 const axiosInstance = axios.create({
   baseURL,
-  timeout: 15000, // Reasonable timeout threshold
+  timeout: 30000, // 30s threshold to accommodate serverless Lambda cold starts
 });
 
 // Request Interceptor: Inject bearer authorization token from localStorage

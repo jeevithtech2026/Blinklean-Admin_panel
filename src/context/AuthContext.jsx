@@ -41,7 +41,16 @@ export const AuthProvider = ({ children }) => {
         throw new Error('Invalid authentication response from server');
       }
     } catch (err) {
-      const errMsg = err.response?.data?.error || err.message || 'Login failed. Please try again.';
+      let errMsg = err.response?.data?.error || err.response?.data?.message;
+      if (!errMsg) {
+        if (err.code === 'ECONNABORTED' || err.message?.includes('timeout')) {
+          errMsg = 'Connection timed out. The server may be waking up, please try again.';
+        } else if (err.message === 'Network Error' || err.code === 'ERR_NETWORK') {
+          errMsg = 'Network Error: Unable to connect to the authentication service. Please check your network connection.';
+        } else {
+          errMsg = err.message || 'Login failed. Please try again.';
+        }
+      }
       setError(errMsg);
       return false;
     } finally {

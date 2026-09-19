@@ -77,7 +77,7 @@ const Login = () => {
                   value={username}
                   onChange={(e) => setUsername(e.target.value)}
                   disabled={isLoading}
-                  placeholder="e.g. admin"
+                  placeholder="e.g. admin or admin@blinklean.com"
                   className="w-full rounded-xl border border-slate-200 bg-slate-50/50 py-3 pl-11 pr-4 text-sm text-slate-800 placeholder-slate-400 outline-none transition-all focus:border-violet-500 focus:bg-white"
                 />
               </div>

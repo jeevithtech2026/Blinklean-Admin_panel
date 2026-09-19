@@ -70,6 +70,8 @@ Resources:
           JWT_SECRET_NAME: "blinklean/admin/jwt"
           RAZORPAY_WEBHOOK_SECRET: !Ref RazorpayWebhookSecret
           BANK_ENCRYPTION_KEY: !Ref BankEncryptionKey
+          COGNITO_CLIENT_ID: "3crjc5qfgrasian98s6nt45qll"
+          COGNITO_USER_POOL_ID: "ap-south-1_XMXyVRQUr"
 
       # Access Policies configuration
       Policies:

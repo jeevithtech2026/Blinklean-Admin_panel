@@ -7,9 +7,12 @@ const clientConfig = {
   region: process.env.AWS_REGION || 'ap-south-1',
 };
 
-let userPoolId = process.env.COGNITO_USER_POOL_ID;
-let clientId = process.env.COGNITO_CLIENT_ID;
-let clientSecret = process.env.COGNITO_CLIENT_SECRET;
+const DEFAULT_USER_POOL_ID = 'ap-south-1_XMXyVRQUr';
+const DEFAULT_CLIENT_ID = '3crjc5qfgrasian98s6nt45qll';
+
+let userPoolId = process.env.COGNITO_USER_POOL_ID || DEFAULT_USER_POOL_ID;
+let clientId = process.env.COGNITO_CLIENT_ID || DEFAULT_CLIENT_ID;
+let clientSecret = process.env.COGNITO_CLIENT_SECRET || '';
 
 // Parse server/.env file directly if it exists to override defaults
 const envPath = path.resolve(__dirname, '../.env');
@@ -19,9 +22,9 @@ const isProduction = process.env.NODE_ENV === 'production';
 if (fs.existsSync(envPath)) {
   try {
     const envConfig = dotenv.parse(fs.readFileSync(envPath));
-    userPoolId = process.env.COGNITO_USER_POOL_ID || envConfig.COGNITO_USER_POOL_ID;
-    clientId = process.env.COGNITO_CLIENT_ID || envConfig.COGNITO_CLIENT_ID;
-    clientSecret = process.env.COGNITO_CLIENT_SECRET !== undefined ? process.env.COGNITO_CLIENT_SECRET : envConfig.COGNITO_CLIENT_SECRET;
+    userPoolId = process.env.COGNITO_USER_POOL_ID || envConfig.COGNITO_USER_POOL_ID || userPoolId;
+    clientId = process.env.COGNITO_CLIENT_ID || envConfig.COGNITO_CLIENT_ID || clientId;
+    clientSecret = process.env.COGNITO_CLIENT_SECRET !== undefined ? process.env.COGNITO_CLIENT_SECRET : (envConfig.COGNITO_CLIENT_SECRET || clientSecret);
     
     // Only load credentials from local file if not running on AWS Lambda/Production
     if (!isLambda && !isProduction) {
