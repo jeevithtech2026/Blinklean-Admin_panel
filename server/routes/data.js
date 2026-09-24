@@ -1103,7 +1103,7 @@ router.get('/system-alerts', async (req, res) => {
 
 // ─── VERIFICATION CODES ───────────────────────────────────────────────────────
 
-// POST /api/v1/data/verification-codes - Generate a new verification code
+// POST /api/v1/data/verification-codes - Generate a new verification code (valid for 30 minutes)
 router.post('/verification-codes', async (req, res) => {
   try {
     const { category } = req.body;
@@ -1114,12 +1114,17 @@ router.post('/verification-codes', async (req, res) => {
     
     // Generate 6-char random alphanumeric code
     const code = Math.random().toString(36).substring(2, 8).toUpperCase();
+    const now = new Date();
+    const expiresAt = new Date(now.getTime() + 30 * 60 * 1000).toISOString(); // 30 mins
+    const ttl = Math.floor(now.getTime() / 1000) + (30 * 60); // 30 mins DynamoDB TTL in seconds
     
     const newCode = {
       code,
       category,
       status: 'active',
-      createdAt: new Date().toISOString(),
+      createdAt: now.toISOString(),
+      expiresAt,
+      ttl,
       usedBy: null
     };
     
@@ -1135,18 +1140,55 @@ router.post('/verification-codes', async (req, res) => {
   }
 });
 
-// GET /api/v1/data/verification-codes - List all verification codes
+// GET /api/v1/data/verification-codes - List active verification codes (auto-purges expired & used codes)
 router.get('/verification-codes', async (req, res) => {
   try {
     const result = await dynamoDB.send(new ScanCommand({ TableName: 'VerificationCodes' }));
-    res.json({ success: true, count: result.Count, data: result.Items });
+    const allCodes = result.Items || [];
+    const now = new Date();
+    const thirtyMinsAgo = new Date(now.getTime() - 30 * 60 * 1000);
+
+    const activeCodes = [];
+    const deletePromises = [];
+
+    for (const item of allCodes) {
+      const isUsed = item.status === 'used';
+      const createdDate = item.createdAt ? new Date(item.createdAt) : new Date(0);
+      const expiryDate = item.expiresAt ? new Date(item.expiresAt) : new Date(createdDate.getTime() + 30 * 60 * 1000);
+      const isExpired = expiryDate < now || createdDate < thirtyMinsAgo;
+
+      if (isUsed || isExpired) {
+        // Auto-delete used or expired code from DynamoDB
+        deletePromises.push(
+          dynamoDB.send(new DeleteCommand({
+            TableName: 'VerificationCodes',
+            Key: { code: item.code }
+          })).catch(delErr => console.warn(`[VerificationCodes] Auto-purge failed for ${item.code}:`, delErr.message))
+        );
+      } else {
+        activeCodes.push({
+          ...item,
+          expiresAt: expiryDate.toISOString(),
+          remainingMinutes: Math.max(0, Math.ceil((expiryDate.getTime() - now.getTime()) / (60 * 1000)))
+        });
+      }
+    }
+
+    // Execute background deletions without blocking response
+    if (deletePromises.length > 0) {
+      Promise.allSettled(deletePromises).then(() => {
+        console.log(`[VerificationCodes] Purged ${deletePromises.length} expired/used codes from DynamoDB.`);
+      });
+    }
+
+    res.json({ success: true, count: activeCodes.length, data: activeCodes });
   } catch (err) {
     console.error('[VerificationCodes] List error:', err.message);
     res.status(500).json({ success: false, error: err.message });
   }
 });
 
-// POST /api/v1/data/verification-codes/validate - Validate a verification code (for Partner App)
+// POST /api/v1/data/verification-codes/validate - Validate a verification code (deleted immediately upon use)
 router.post('/verification-codes/validate', async (req, res) => {
   try {
     const { code, category } = req.body;
@@ -1155,15 +1197,31 @@ router.post('/verification-codes/validate', async (req, res) => {
       return res.status(400).json({ success: false, error: 'Code and category are required' });
     }
     
+    const formattedCode = code.toString().trim().toUpperCase();
+    
     const result = await dynamoDB.send(new GetCommand({
       TableName: 'VerificationCodes',
-      Key: { code: code.toUpperCase() }
+      Key: { code: formattedCode }
     }));
     
     const record = result.Item;
     
     if (!record) {
-      return res.status(404).json({ success: false, error: 'Invalid verification code' });
+      return res.status(404).json({ success: false, error: 'Invalid or expired verification code' });
+    }
+    
+    const now = new Date();
+    const createdDate = record.createdAt ? new Date(record.createdAt) : new Date(0);
+    const expiryDate = record.expiresAt ? new Date(record.expiresAt) : new Date(createdDate.getTime() + 30 * 60 * 1000);
+    
+    // Check if code has expired (30 mins)
+    if (expiryDate < now || (now.getTime() - createdDate.getTime()) > (30 * 60 * 1000)) {
+      // Auto-delete expired code
+      await dynamoDB.send(new DeleteCommand({
+        TableName: 'VerificationCodes',
+        Key: { code: record.code }
+      })).catch(() => {});
+      return res.status(400).json({ success: false, error: 'Verification code has expired (30-minute validity exceeded)' });
     }
     
     if (record.category !== category) {
@@ -1171,26 +1229,47 @@ router.post('/verification-codes/validate', async (req, res) => {
     }
     
     if (record.status !== 'active') {
-      return res.status(400).json({ success: false, error: 'This verification code has already been used or is inactive' });
+      // Auto-delete inactive/used code
+      await dynamoDB.send(new DeleteCommand({
+        TableName: 'VerificationCodes',
+        Key: { code: record.code }
+      })).catch(() => {});
+      return res.status(400).json({ success: false, error: 'This verification code has already been used or expired' });
     }
     
-    // Mark as used (optional: the partner app might call a separate endpoint after full registration to mark it used, 
-    // but we can mark it used here or just return success and let the registration flow handle marking it).
-    // Let's mark it as used immediately upon validation for security.
-    await dynamoDB.send(new UpdateCommand({
+    // Delete immediately once used from DynamoDB table
+    await dynamoDB.send(new DeleteCommand({
       TableName: 'VerificationCodes',
-      Key: { code: record.code },
-      UpdateExpression: 'SET #st = :status, usedAt = :usedAt',
-      ExpressionAttributeNames: { '#st': 'status' },
-      ExpressionAttributeValues: {
-        ':status': 'used',
-        ':usedAt': new Date().toISOString()
-      }
+      Key: { code: record.code }
     }));
     
-    res.json({ success: true, message: 'Verification successful' });
+    console.log(`[VerificationCodes] Code ${record.code} successfully validated and deleted from database.`);
+    
+    res.json({ success: true, message: 'Verification successful. Code consumed and removed.' });
   } catch (err) {
     console.error('[VerificationCodes] Validate error:', err.message);
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// DELETE /api/v1/data/verification-codes/:code - Manually delete a verification code
+router.delete('/verification-codes/:code', async (req, res) => {
+  try {
+    const { code } = req.params;
+    if (!code) {
+      return res.status(400).json({ success: false, error: 'Code parameter is required' });
+    }
+
+    const formattedCode = code.toString().trim().toUpperCase();
+    await dynamoDB.send(new DeleteCommand({
+      TableName: 'VerificationCodes',
+      Key: { code: formattedCode }
+    }));
+
+    console.log(`[VerificationCodes] Manually deleted code ${formattedCode}`);
+    res.json({ success: true, message: `Verification code ${formattedCode} deleted successfully` });
+  } catch (err) {
+    console.error('[VerificationCodes] Delete error:', err.message);
     res.status(500).json({ success: false, error: err.message });
   }
 });
