@@ -112,13 +112,13 @@ const Payouts = () => {
       <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
         <div>
           <div className="flex items-center gap-2">
-            <h1 className="text-2xl font-bold tracking-tight text-slate-900 dark:text-white">Partner Weekly Payouts & Earnings</h1>
+            <h1 className="text-2xl font-bold tracking-tight text-slate-900 dark:text-white">Partner Payouts & Earnings</h1>
             <span className="inline-flex items-center gap-1 rounded-full bg-violet-50 dark:bg-violet-950/40 px-2.5 py-0.5 text-[11px] font-bold text-violet-700 dark:text-violet-400 border border-violet-200 dark:border-violet-900/40">
-              <Calendar className="h-3 w-3" /> Weekly Settlement Cycle
+              <Calendar className="h-3 w-3" /> Weekly Settlement
             </span>
           </div>
           <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">
-            Displaying <strong className="text-violet-600 dark:text-violet-400">This Week's Earnings</strong> as the needed payment. Check any partner's <strong className="text-slate-700 dark:text-slate-300">Total Lifetime Earnings</strong> in the dedicated column.
+            Click on any partner name to view bank account details, weekly jobs, this week's earnings, total earnings till date, and process payouts.
           </p>
         </div>
 
