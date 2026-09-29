@@ -1,13 +1,13 @@
 import React, { useState, useMemo, useEffect } from 'react';
-import { ShieldAlert, ArrowUpDown, ChevronLeft, ChevronRight, Search, CheckCircle, Clock, XCircle, CreditCard, Calendar, UserCheck, AlertCircle, Recycle } from 'lucide-react';
+import { ShieldAlert, ArrowUpDown, ChevronLeft, ChevronRight, Search, CheckCircle, Clock, XCircle, CreditCard, Calendar, UserCheck, AlertCircle, Recycle, CalendarClock } from 'lucide-react';
 import { useTheme } from '../context/ThemeContext';
 
 const BookingsTable = ({ bookings }) => {
   const { density } = useTheme();
 
   const [searchQuery, setSearchQuery] = useState('');
-  const [sortField, setSortField] = useState(null);
-  const [sortDirection, setSortDirection] = useState(null);
+  const [sortField, setSortField] = useState('createdAt');
+  const [sortDirection, setSortDirection] = useState('desc');
   const [currentPage, setCurrentPage] = useState(1);
   const [rowsPerPage, setRowsPerPage] = useState(50);
 
@@ -30,6 +30,21 @@ const BookingsTable = ({ bookings }) => {
       // fallback to raw string
     }
     return raw;
+  };
+
+  const formatCreatedAt = (createdAt) => {
+    if (!createdAt) return null;
+    try {
+      const parsed = new Date(createdAt);
+      if (!isNaN(parsed.getTime())) {
+        const date = parsed.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
+        const time = parsed.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true });
+        return { date, time };
+      }
+    } catch {
+      // ignore
+    }
+    return null;
   };
 
   const getStatusBadge = (status) => {
@@ -69,10 +84,14 @@ const BookingsTable = ({ bookings }) => {
     return [...filteredBookings].sort((a, b) => {
       let valA = a[sortField];
       let valB = b[sortField];
-      
+
       if (sortField === 'amount') {
         valA = Number(valA) || 0;
         valB = Number(valB) || 0;
+      } else if (sortField === 'createdAt') {
+        // Sort by actual date/time for newest-first ordering
+        valA = valA ? new Date(valA).getTime() : 0;
+        valB = valB ? new Date(valB).getTime() : 0;
       } else {
         valA = (valA || '').toString().toLowerCase();
         valB = (valB || '').toString().toLowerCase();
@@ -136,7 +155,10 @@ const BookingsTable = ({ bookings }) => {
                 <th className={thPadding} onClick={() => handleSort('status')}>
                   <div className="flex items-center gap-1.5 cursor-pointer">Status {renderSortIndicator('status')}</div>
                 </th>
-                <th className={thPadding}>Schedule Date</th>
+                <th className={thPadding}>Schedule Date & Time</th>
+                <th className={thPadding} onClick={() => handleSort('createdAt')}>
+                  <div className="flex items-center gap-1.5 cursor-pointer">Booked On {renderSortIndicator('createdAt')}</div>
+                </th>
               </tr>
             </thead>
             <tbody className={`divide-y divide-slate-100 dark:divide-slate-800 ${bodyTextSize}`}>
@@ -220,7 +242,7 @@ const BookingsTable = ({ bookings }) => {
                       {/* Status */}
                       <td className={tdPadding}>{getStatusBadge(booking.status)}</td>
 
-                      {/* Schedule Date */}
+                      {/* Schedule Date & Time */}
                       <td className={tdPadding}>
                         <div className="flex items-center gap-1.5 font-semibold text-slate-700 dark:text-slate-300">
                           <Calendar className="h-3.5 w-3.5 text-slate-400" />
@@ -228,12 +250,30 @@ const BookingsTable = ({ bookings }) => {
                         </div>
                         <div className="text-[10px] text-slate-400 mt-0.5 ml-5">{booking.time || '—'}</div>
                       </td>
+
+                      {/* Booked On (createdAt) */}
+                      <td className={tdPadding}>
+                        {(() => {
+                          const created = formatCreatedAt(booking.createdAt);
+                          return created ? (
+                            <div>
+                              <div className="flex items-center gap-1.5 font-semibold text-slate-700 dark:text-slate-300">
+                                <CalendarClock className="h-3.5 w-3.5 text-violet-400" />
+                                {created.date}
+                              </div>
+                              <div className="text-[10px] text-violet-500 dark:text-violet-400 font-semibold mt-0.5 ml-5">{created.time}</div>
+                            </div>
+                          ) : (
+                            <span className="text-slate-400">—</span>
+                          );
+                        })()}
+                      </td>
                     </tr>
                   );
                 })
               ) : (
                 <tr>
-                  <td colSpan="6" className="px-6 py-12 text-center text-slate-400 dark:text-slate-500">
+                  <td colSpan="7" className="px-6 py-12 text-center text-slate-400 dark:text-slate-500">
                     <div className="flex flex-col items-center gap-3">
                       <ShieldAlert className="h-9 w-9 text-slate-300 dark:text-slate-700" />
                       <h4 className="text-sm font-bold text-slate-800 dark:text-slate-300">No records found</h4>
