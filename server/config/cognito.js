@@ -7,12 +7,12 @@ const clientConfig = {
   region: process.env.AWS_REGION || 'ap-south-1',
 };
 
-const DEFAULT_USER_POOL_ID = 'ap-south-1_XMXyVRQUr';
-const DEFAULT_CLIENT_ID = '3crjc5qfgrasian98s6nt45qll';
+const DEFAULT_USER_POOL_ID = 'ap-south-1_ASeLJoGuQ';
+const DEFAULT_CLIENT_ID = '4svd4dair2i80eqindrhrpdrou';
 
 let userPoolId = process.env.COGNITO_USER_POOL_ID || DEFAULT_USER_POOL_ID;
 let clientId = process.env.COGNITO_CLIENT_ID || DEFAULT_CLIENT_ID;
-let clientSecret = process.env.COGNITO_CLIENT_SECRET || '';
+let clientSecret = process.env.COGNITO_CLIENT_SECRET || '4uq08n31ref8vq73c90ann7rg45m24t9avpfhkng9tmicuq3rk2';
 
 // Parse server/.env file directly if it exists to override defaults
 const envPath = path.resolve(__dirname, '../.env');

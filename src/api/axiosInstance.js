@@ -3,30 +3,35 @@ import { triggerGlobalNotification } from '../context/NotificationContext';
 
 const PROD_API_GATEWAY_URL = 'https://95t7w0g5nd.execute-api.ap-south-1.amazonaws.com/production';
 
-// Safely access environment variables, ensuring production/deployed sites always use AWS API Gateway
+// Safely access environment variables, ensuring production/deployed sites use AWS API Gateway and localhost uses local server
 const getBaseURL = () => {
-  // If running in browser and hostname is NOT localhost / 127.0.0.1 (e.g. Amplify, Netlify, custom domain)
   if (typeof window !== 'undefined' && window.location) {
     const isLocalhost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
-    if (!isLocalhost) {
-      const remoteEnvUrl =
+    if (isLocalhost) {
+      const localEnvUrl =
         (import.meta?.env?.VITE_ADMIN_API_GATEWAY_URL) ||
         (typeof process !== 'undefined' ? process.env?.REACT_APP_ADMIN_API_GATEWAY_URL : null);
-      if (remoteEnvUrl && !remoteEnvUrl.includes('localhost') && !remoteEnvUrl.includes('127.0.0.1')) {
-        return remoteEnvUrl;
+      if (localEnvUrl && (localEnvUrl.includes('localhost') || localEnvUrl.includes('127.0.0.1'))) {
+        return localEnvUrl;
       }
-      return PROD_API_GATEWAY_URL;
+      return 'http://localhost:5000';
     }
+
+    // Remote / Deployed environment
+    const remoteEnvUrl =
+      (import.meta?.env?.VITE_ADMIN_API_GATEWAY_URL) ||
+      (typeof process !== 'undefined' ? process.env?.REACT_APP_ADMIN_API_GATEWAY_URL : null);
+    if (remoteEnvUrl && !remoteEnvUrl.includes('localhost') && !remoteEnvUrl.includes('127.0.0.1')) {
+      return remoteEnvUrl;
+    }
+    return PROD_API_GATEWAY_URL;
   }
 
   // Local development / fallback
   if (import.meta?.env?.VITE_ADMIN_API_GATEWAY_URL) {
     return import.meta.env.VITE_ADMIN_API_GATEWAY_URL;
   }
-  if (typeof process !== 'undefined' && process.env?.REACT_APP_ADMIN_API_GATEWAY_URL) {
-    return process.env.REACT_APP_ADMIN_API_GATEWAY_URL;
-  }
-  return PROD_API_GATEWAY_URL;
+  return 'http://localhost:5000';
 };
 
 export const baseURL = getBaseURL();

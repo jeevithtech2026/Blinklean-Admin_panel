@@ -51,6 +51,16 @@ export default defineConfig({
     tailwindcss(),
     customCompressionPlugin()
   ],
+  server: {
+    host: '0.0.0.0',
+    port: 5173,
+    proxy: {
+      '/api': {
+        target: 'http://localhost:5000',
+        changeOrigin: true
+      }
+    }
+  },
   esbuild: {
     // Drop all console.log and debugger statements programmatically in production build
     drop: ['console', 'debugger']
