@@ -1,0 +1,154 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: 'CloudFormation Stack for BlinkLean Admin Panel Backend API and Lambda'
+
+Resources:
+  AdminBackendFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: blinklean-admin-backend-api
+      Description: BlinkLean Admin Aggregation Express API Service
+      Runtime: nodejs20.x
+      Handler: lambda.handler
+      Role: !Sub 'arn:aws:iam::${AWS::AccountId}:role/blinklean-admin-backend-lambda-role'
+      Code:
+        S3Bucket: blinklean-assets-123
+        S3Key: server_lambda.zip
+      Timeout: 30
+      MemorySize: 512
+      Environment:
+        Variables:
+          NODE_ENV: production
+          JWT_SECRET: blinklean_super_secret_jwt_key_change_in_production
+          COGNITO_USER_POOL_ID: ap-south-1_ASeLJoGuQ
+          COGNITO_CLIENT_ID: 4svd4dair2i80eqindrhrpdrou
+          COGNITO_CLIENT_SECRET: 4uq08n31ref8vq73c90ann7rg45m24t9avpfhkng9tmicuq3rk2
+          CUSTOMER_DB_HOST: blinklean-db-cluster-instance-1.c1koi4uqajfi.ap-south-1.rds.amazonaws.com
+          CUSTOMER_DB_PORT: '5432'
+          CUSTOMER_DB_USER: postgres
+          CUSTOMER_DB_PASSWORD: Blinklean2026
+          CUSTOMER_DB_NAME: postgres
+          PARTNER_DB_HOST: blinklean-db-cluster-instance-1.c1koi4uqajfi.ap-south-1.rds.amazonaws.com
+          PARTNER_DB_PORT: '5432'
+          PARTNER_DB_USER: postgres
+          PARTNER_DB_PASSWORD: Blinklean2026
+          PARTNER_DB_NAME: postgres
+          RAZORPAY_WEBHOOK_SECRET: Blinklean@2026!@12
+          BANK_ENCRYPTION_KEY: 989b9fd54985c7e4f9c8ab2991f3c81e3acb24a492c899d0d9d09d47d2a629c4
+
+  AdminRestApi:
+    Type: AWS::ApiGateway::RestApi
+    Properties:
+      Name: BlinkLeanAdminAPI
+      Description: Production API Gateway for BlinkLean Admin Panel
+      EndpointConfiguration:
+        Types:
+          - REGIONAL
+
+  AdminApiProxyResource:
+    Type: AWS::ApiGateway::Resource
+    Properties:
+      RestApiId: !Ref AdminRestApi
+      ParentId: !GetAtt AdminRestApi.RootResourceId
+      PathPart: '{proxy+}'
+
+  AdminApiRootMethod:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      RestApiId: !Ref AdminRestApi
+      ResourceId: !GetAtt AdminRestApi.RootResourceId
+      HttpMethod: ANY
+      AuthorizationType: NONE
+      Integration:
+        Type: AWS_PROXY
+        IntegrationHttpMethod: POST
+        Uri: !Sub 'arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${AdminBackendFunction.Arn}/invocations'
+
+  AdminApiProxyMethod:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      RestApiId: !Ref AdminRestApi
+      ResourceId: !Ref AdminApiProxyResource
+      HttpMethod: ANY
+      AuthorizationType: NONE
+      Integration:
+        Type: AWS_PROXY
+        IntegrationHttpMethod: POST
+        Uri: !Sub 'arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${AdminBackendFunction.Arn}/invocations'
+
+  AdminApiRootOptionsMethod:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      RestApiId: !Ref AdminRestApi
+      ResourceId: !GetAtt AdminRestApi.RootResourceId
+      HttpMethod: OPTIONS
+      AuthorizationType: NONE
+      Integration:
+        Type: MOCK
+        RequestTemplates:
+          application/json: '{"statusCode": 200}'
+        IntegrationResponses:
+          - StatusCode: 200
+            ResponseParameters:
+              method.response.header.Access-Control-Allow-Headers: "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token'"
+              method.response.header.Access-Control-Allow-Methods: "'GET,POST,PUT,DELETE,OPTIONS'"
+              method.response.header.Access-Control-Allow-Origin: "'*'"
+      MethodResponses:
+        - StatusCode: 200
+          ResponseParameters:
+            method.response.header.Access-Control-Allow-Headers: true
+            method.response.header.Access-Control-Allow-Methods: true
+            method.response.header.Access-Control-Allow-Origin: true
+
+  AdminApiProxyOptionsMethod:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      RestApiId: !Ref AdminRestApi
+      ResourceId: !Ref AdminApiProxyResource
+      HttpMethod: OPTIONS
+      AuthorizationType: NONE
+      Integration:
+        Type: MOCK
+        RequestTemplates:
+          application/json: '{"statusCode": 200}'
+        IntegrationResponses:
+          - StatusCode: 200
+            ResponseParameters:
+              method.response.header.Access-Control-Allow-Headers: "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token'"
+              method.response.header.Access-Control-Allow-Methods: "'GET,POST,PUT,DELETE,OPTIONS'"
+              method.response.header.Access-Control-Allow-Origin: "'*'"
+      MethodResponses:
+        - StatusCode: 200
+          ResponseParameters:
+            method.response.header.Access-Control-Allow-Headers: true
+            method.response.header.Access-Control-Allow-Methods: true
+            method.response.header.Access-Control-Allow-Origin: true
+
+  AdminApiDeployment:
+    Type: AWS::ApiGateway::Deployment
+    DependsOn:
+      - AdminApiRootMethod
+      - AdminApiProxyMethod
+      - AdminApiRootOptionsMethod
+      - AdminApiProxyOptionsMethod
+    Properties:
+      RestApiId: !Ref AdminRestApi
+
+  AdminApiStage:
+    Type: AWS::ApiGateway::Stage
+    Properties:
+      RestApiId: !Ref AdminRestApi
+      DeploymentId: !Ref AdminApiDeployment
+      StageName: production
+
+  AdminLambdaPermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName: !Ref AdminBackendFunction
+      Action: lambda:InvokeFunction
+      Principal: apigateway.amazonaws.com
+      SourceArn: !Sub 'arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${AdminRestApi}/*'
+
+Outputs:
+  ApiUrl:
+    Description: 'Production API Gateway URL'
+    Value: !Sub 'https://${AdminRestApi}.execute-api.${AWS::Region}.amazonaws.com/production'

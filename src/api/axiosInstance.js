@@ -1,7 +1,7 @@
 import axios from 'axios';
 import { triggerGlobalNotification } from '../context/NotificationContext';
 
-const PROD_API_GATEWAY_URL = 'https://95t7w0g5nd.execute-api.ap-south-1.amazonaws.com/production';
+const PROD_API_GATEWAY_URL = 'https://wgv2qp3azg.execute-api.ap-south-1.amazonaws.com/production';
 
 // Safely access environment variables, ensuring production/deployed sites use AWS API Gateway and localhost uses local server
 const getBaseURL = () => {
